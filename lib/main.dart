@@ -1,13 +1,51 @@
 
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
-  runApp(const NightLinkApp());
-}
+const supabaseUrl = 'https://falimxmpicqaakjnigkv.supabase.co';
+const supabaseKey = String.fromEnvironment(
+  'SUPABASE_PUBLISHABLE_KEY',
+);
 
 const gold = Color(0xFFFFC857);
 const blue = Color(0xFF2589FF);
 const dark = Color(0xFF090D18);
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  if (supabaseKey.isEmpty) {
+    runApp(const SetupErrorApp());
+    return;
+  }
+
+  await Supabase.initialize(
+    url: supabaseUrl,
+    publishableKey: supabaseKey,
+  );
+
+  runApp(const NightLinkApp());
+}
+
+class SetupErrorApp extends StatelessWidget {
+  const SetupErrorApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      home: Scaffold(
+        backgroundColor: dark,
+        body: Center(
+          child: Text(
+            'Supabase key is missing.\nCheck GitHub Actions variables.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: gold),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class NightLinkApp extends StatelessWidget {
   const NightLinkApp({super.key});
@@ -16,7 +54,7 @@ class NightLinkApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'NightLink 18+',
+      title: 'NightLink Live',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: dark,
         colorScheme: const ColorScheme.dark(
@@ -55,8 +93,7 @@ class _AgeScreenState extends State<AgeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.nightlight_round,
-                color: gold, size: 75),
+            const Icon(Icons.nightlight_round, color: gold, size: 75),
             const SizedBox(height: 20),
             const Text(
               'NIGHTLINK',
@@ -71,24 +108,20 @@ class _AgeScreenState extends State<AgeScreen> {
               'CONNECT • CHAT • COMPETE',
               style: TextStyle(color: blue, letterSpacing: 2),
             ),
-            const SizedBox(height: 45),
+            const SizedBox(height: 40),
             const Text(
               'WELCOME TO THE 18+ COMMUNITY',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 15),
             const Text(
-              'Meet people, enjoy live conversations, '
-              'send messages and compete in exciting '
-              'X vs Y battles.',
+              'Meet people, enjoy conversations, send messages '
+              'and compete in exciting battles.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white70, height: 1.6),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 25),
             CheckboxListTile(
               value: accepted,
               activeColor: gold,
@@ -115,17 +148,14 @@ class _AgeScreenState extends State<AgeScreen> {
                         Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const HomeScreen(),
+                            builder: (_) => const AuthGate(),
                           ),
                         );
                       }
                     : null,
                 child: const Text(
                   'ENTER NIGHTLINK',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -141,25 +171,231 @@ class _AgeScreenState extends State<AgeScreen> {
   }
 }
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  int selected = 0;
-
-  final pages = const [
-    ('Discover', Icons.explore),
-    ('Messages', Icons.chat),
-    ('X vs Y Battles', Icons.bolt),
-    ('My Profile', Icons.person),
-  ];
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final client = Supabase.instance.client;
+
+    return StreamBuilder<AuthState>(
+      stream: client.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        final session = client.auth.currentSession;
+
+        if (session != null) {
+          return const HomeScreen();
+        }
+
+        return const LoginScreen();
+      },
+    );
+  }
+}
+
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  final nameController = TextEditingController();
+
+  bool isSignup = false;
+  bool loading = false;
+  bool obscurePassword = true;
+  String message = '';
+
+  Future<void> submit() async {
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+    final name = nameController.text.trim();
+
+    if (email.isEmpty || password.isEmpty ||
+        (isSignup && name.isEmpty)) {
+      setState(() => message = 'Please complete all fields.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setState(() => message = 'Password must be at least 6 characters.');
+      return;
+    }
+
+    setState(() {
+      loading = true;
+      message = '';
+    });
+
+    try {
+      final auth = Supabase.instance.client.auth;
+
+      if (isSignup) {
+        final result = await auth.signUp(
+          email: email,
+          password: password,
+          data: {'display_name': name},
+        );
+
+        if (!mounted) return;
+
+        if (result.session == null) {
+          setState(() {
+            message = 'Account created! Check your email and verify '
+                'your account before logging in.';
+          });
+        }
+      } else {
+        await auth.signInWithPassword(
+          email: email,
+          password: password,
+        );
+      }
+    } on AuthException catch (error) {
+      if (mounted) setState(() => message = error.message);
+    } catch (error) {
+      if (mounted) setState(() => message = 'Something went wrong. Please try again.');
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(26),
+          child: Column(
+            children: [
+              const Icon(Icons.nightlight_round, color: gold, size: 65),
+              const SizedBox(height: 12),
+              const Text(
+                'NIGHTLINK',
+                style: TextStyle(
+                  color: gold,
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 4,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isSignup ? 'CREATE YOUR ACCOUNT' : 'WELCOME BACK',
+                style: const TextStyle(color: blue, letterSpacing: 2),
+              ),
+              const SizedBox(height: 35),
+              if (isSignup)
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Display name',
+                    prefixIcon: Icon(Icons.person_outline),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              if (isSignup) const SizedBox(height: 15),
+              TextField(
+                controller: emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Email address',
+                  prefixIcon: Icon(Icons.email_outlined),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 15),
+              TextField(
+                controller: passwordController,
+                obscureText: obscurePassword,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      obscurePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                    ),
+                    onPressed: () {
+                      setState(() => obscurePassword = !obscurePassword);
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              if (message.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 15),
+                  child: Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: gold),
+                  ),
+                ),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: gold,
+                    foregroundColor: dark,
+                  ),
+                  onPressed: loading ? null : submit,
+                  child: loading
+                      ? const CircularProgressIndicator()
+                      : Text(
+                          isSignup ? 'CREATE ACCOUNT' : 'LOGIN',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              TextButton(
+                onPressed: loading
+                    ? null
+                    : () {
+                        setState(() {
+                          isSignup = !isSignup;
+                          message = '';
+                        });
+                      },
+                child: Text(
+                  isSignup
+                      ? 'Already have an account? Login'
+                      : 'New to NightLink? Create account',
+                  style: const TextStyle(color: blue),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final user = Supabase.instance.client.auth.currentUser;
+    final name = user?.userMetadata?['display_name'] ?? 'Member';
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: dark,
@@ -167,9 +403,14 @@ class _HomeScreenState extends State<HomeScreen> {
           'NIGHTLINK',
           style: TextStyle(color: gold, fontWeight: FontWeight.bold),
         ),
-        actions: const [
-          Icon(Icons.notifications_none, color: blue),
-          SizedBox(width: 18),
+        actions: [
+          IconButton(
+            tooltip: 'Sign out',
+            icon: const Icon(Icons.logout, color: blue),
+            onPressed: () async {
+              await Supabase.instance.client.auth.signOut();
+            },
+          ),
         ],
       ),
       body: Center(
@@ -178,58 +419,44 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(pages[selected].$2, size: 65, color: gold),
+              const Icon(Icons.verified_user, color: gold, size: 65),
               const SizedBox(height: 20),
               Text(
-                pages[selected].$1,
+                'Welcome, $name!',
+                textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontSize: 27,
+                  fontSize: 26,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 12),
+              Text(
+                user?.email ?? '',
+                style: const TextStyle(color: Colors.white60),
+              ),
+              const SizedBox(height: 30),
               const Text(
-                'Your live social experience starts here.',
+                'YOUR NIGHTLINK ACCOUNT IS CONNECTED',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white60),
+                style: TextStyle(color: blue, letterSpacing: 1),
               ),
               const SizedBox(height: 25),
-              if (selected == 2)
-                const Text(
-                  'PLAYER X  VS  PLAYER Y\n\nLIVE BATTLES COMING SOON',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: blue, height: 2),
-                ),
+              const Text(
+                'Discover • Messages • Live Battles • Profile',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 15),
+              const Text(
+                'More live features are coming in the next updates.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white38),
+              ),
             ],
           ),
         ),
       ),
-      bottomNavigationBar: NavigationBar(
-        backgroundColor: const Color(0xFF151C2C),
-        selectedIndex: selected,
-        indicatorColor: blue.withOpacity(0.25),
-        onDestinationSelected: (index) {
-          setState(() => selected = index);
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.explore_outlined),
-            label: 'Discover',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.chat_outlined),
-            label: 'Chats',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.bolt),
-            label: 'Battles',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            label: 'Profile',
-          ),
-        ],
-      ),
     );
   }
 }
+
