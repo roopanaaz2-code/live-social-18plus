@@ -2,7 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+const supabaseUrl = String.fromEnvironment(
+  'SUPABASE_URL',
+  defaultValue: 'https://falimxmpicqaakjnigkv.supabase.co',
+);
 const supabaseKey = String.fromEnvironment(
   'SUPABASE_PUBLISHABLE_KEY',
 );
@@ -14,7 +17,7 @@ const dark = Color(0xFF090D18);
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (supabaseUrl.isEmpty || supabaseKey.isEmpty) {
+  if (supabaseKey.isEmpty) {
     runApp(const SetupErrorApp());
     return;
   }

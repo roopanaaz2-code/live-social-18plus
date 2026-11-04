@@ -57,11 +57,13 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
         run: |
-          test -n "$SUPABASE_URL" || (echo 'SUPABASE_URL secret is missing' >&2; exit 1)
           test -n "$SUPABASE_PUBLISHABLE_KEY" || (echo 'SUPABASE_PUBLISHABLE_KEY secret is missing' >&2; exit 1)
-          flutter build apk --release \
-            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
+          build_args=(flutter build apk --release)
+          if [ -n "$SUPABASE_URL" ]; then
+            build_args+=(--dart-define=SUPABASE_URL="$SUPABASE_URL")
+          fi
+          build_args+=(--dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY")
+          "${build_args[@]}"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
