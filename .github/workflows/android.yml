@@ -34,13 +34,19 @@ jobs:
         run: |
           cp lib/main.dart "$RUNNER_TEMP/nightlink/lib/main.dart"
 
-      - name: Install dependencies
+      - name: Install Supabase dependency
         working-directory: ${{ runner.temp }}/nightlink
-        run: flutter pub get
+        run: |
+          flutter pub add supabase_flutter
+          flutter pub get
 
       - name: Build Android APK
         working-directory: ${{ runner.temp }}/nightlink
-        run: flutter build apk --release
+        env:
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          flutter build apk --release \
+            --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -48,3 +54,4 @@ jobs:
           name: NightLink-Android-APK
           path: ${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
+
