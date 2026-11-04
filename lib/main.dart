@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-const supabaseUrl = 'https://falimxmpicqaakjnigkv.supabase.co';
+const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
 const supabaseKey = String.fromEnvironment(
   'SUPABASE_PUBLISHABLE_KEY',
 );
@@ -14,7 +14,7 @@ const dark = Color(0xFF090D18);
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (supabaseKey.isEmpty) {
+  if (supabaseUrl.isEmpty || supabaseKey.isEmpty) {
     runApp(const SetupErrorApp());
     return;
   }
@@ -459,4 +459,3 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
-

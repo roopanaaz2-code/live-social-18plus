@@ -29,6 +29,17 @@ jobs:
             --project-name nightlink \
             --org com.nightlink \
             "$RUNNER_TEMP/nightlink"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          manifest = Path(os.environ["RUNNER_TEMP"]) / "nightlink/android/app/src/main/AndroidManifest.xml"
+          text = manifest.read_text()
+          permission = '    <uses-permission android:name="android.permission.INTERNET" />\n'
+          if 'android.permission.INTERNET' not in text:
+              text = text.replace('<application', permission + '    <application', 1)
+              manifest.write_text(text)
+          PY
 
       - name: Add NightLink app code
         run: |
@@ -43,9 +54,13 @@ jobs:
       - name: Build Android APK
         working-directory: ${{ runner.temp }}/nightlink
         env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
         run: |
+          test -n "$SUPABASE_URL" || (echo 'SUPABASE_URL secret is missing' >&2; exit 1)
+          test -n "$SUPABASE_PUBLISHABLE_KEY" || (echo 'SUPABASE_PUBLISHABLE_KEY secret is missing' >&2; exit 1)
           flutter build apk --release \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
 
       - name: Upload APK
@@ -54,4 +69,3 @@ jobs:
           name: NightLink-Android-APK
           path: ${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
-
