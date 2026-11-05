@@ -113,6 +113,8 @@ Deno.serve(async (req: Request) => {
           .select("id, caller_id, receiver_id, call_mode, room_name, status")
           .eq("room_name", body.roomName)
           .eq("status", "accepted")
+          .order("created_at", { ascending: false })
+          .limit(1)
           .maybeSingle();
       } else {
         return json({ error: "An accepted call invitation is required" }, 400);
