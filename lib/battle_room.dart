@@ -27,6 +27,7 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
   Duration _remaining = const Duration(minutes: 4);
   List<Map<String, dynamic>> _players = [];
   List<Map<String, dynamic>> _scores = [];
+  List<Map<String, dynamic>> _likes = [];
   List<Map<String, dynamic>> _gifts = [];
   List<Map<String, dynamic>> _comments = [];
   List<Map<String, dynamic>> _giftEvents = [];
@@ -141,11 +142,13 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
           .select('id, sender_id, recipient_id, team_no, gift_key, quantity, score_added, sender_name, recipient_name, gift_name, gift_emoji, created_at')
           .eq('match_id', widget.matchId).order('created_at', ascending: false).limit(20),
       _db.from('battle_scores').select('team_no, score').eq('match_id', widget.matchId),
+      _db.from('battle_likes').select('host_id, viewer_id').eq('match_id', widget.matchId),
     ]);
     _gifts = (results[0] as List).cast<Map<String, dynamic>>();
     _comments = (results[1] as List).cast<Map<String, dynamic>>().reversed.toList();
     _giftEvents = (results[2] as List).cast<Map<String, dynamic>>();
     _scores = (results[3] as List).cast<Map<String, dynamic>>();
+    _likes = (results[4] as List).cast<Map<String, dynamic>>();
     if (_selectedRecipientId == null && _players.isNotEmpty) {
       _selectedRecipientId = _players.first['user_id']?.toString();
       if (_selectedRecipientId == _myId && _players.length > 1) {
@@ -458,6 +461,10 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
                       maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     )),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.favorite, color: Colors.pinkAccent, size: 13),
+                    Text('${_hostLikeCount(userId)}', style: const TextStyle(color: Colors.pinkAccent, fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 8),
                     Text('$score pts', style: const TextStyle(color: _gold, fontWeight: FontWeight.bold)),
                   ],
                 ),
@@ -475,6 +482,8 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
     final teams = _scores.map((row) => (row['team_no'] as num?)?.toInt() ?? 1).toSet().toList()..sort();
     return teams.isEmpty ? [1, 2] : teams;
   }
+
+  int _hostLikeCount(String hostId) => _likes.where((row) => row['host_id'].toString() == hostId).length;
 
   int _teamScore(int team) {
     for (final row in _scores) {
