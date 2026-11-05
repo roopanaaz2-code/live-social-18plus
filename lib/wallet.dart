@@ -18,6 +18,8 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
     with WidgetsBindingObserver {
   final _client = Supabase.instance.client;
   int _balance = 0;
+  int _giftCoinsReceived = 0;
+  int _giftsReceived = 0;
   List<Map<String, dynamic>> _packages = [];
   bool get _isDeveloper =>
       _client.auth.currentUser?.id == 'fcdb86f2-1fce-4f7a-8d84-f1ace7df12cd';
@@ -46,12 +48,21 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
             .eq('user_id', user.id).maybeSingle(),
         _client.from('coin_packages').select('package_code, coins, amount, currency')
             .eq('active', true).order('amount'),
+        _client.from('battle_gifts').select('coins_spent, quantity')
+            .eq('recipient_id', user.id),
       ]);
       if (!mounted) return;
       final wallet = results[0] as Map<String, dynamic>?;
+      final received = (results[2] as List).cast<Map<String, dynamic>>();
+      final giftCoins = received.fold<int>(0, (sum, gift) =>
+          sum + ((gift['coins_spent'] as num?)?.toInt() ?? 0));
+      final giftCount = received.fold<int>(0, (sum, gift) =>
+          sum + ((gift['quantity'] as num?)?.toInt() ?? 1));
       setState(() {
         _balance = (wallet?['balance'] as num?)?.toInt() ?? 0;
         _packages = (results[1] as List).cast<Map<String, dynamic>>();
+        _giftCoinsReceived = giftCoins;
+        _giftsReceived = giftCount;
         _loading = false;
       });
     } catch (error) {
@@ -101,6 +112,24 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
                         Text(_isDeveloper ? 'UNLIMITED' : '$_balance', style: const TextStyle(color: _gold, fontSize: 34, fontWeight: FontWeight.bold)),
                         Text(_isDeveloper ? 'DEVELOPER VIP' : 'NIGHTLINK COINS', style: const TextStyle(color: _blue, fontSize: 11, letterSpacing: 2)),
                       ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Card(
+                    color: const Color(0xFF17233D),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('GIFTS RECEIVED', style: TextStyle(color: _gold, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                          const SizedBox(height: 8),
+                          Text('$_giftsReceived gifts received', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                          Text('$_giftCoinsReceived coins spent by senders on your gifts', style: const TextStyle(color: _blue)),
+                          const SizedBox(height: 6),
+                          const Text('Gift value is tracked here for transparency. It is not a cash payout or withdrawable balance until a verified creator-payout system is added.', style: TextStyle(color: Colors.white54, fontSize: 11, height: 1.4)),
+                        ],
+                      ),
                     ),
                   ),
                   if (_error != null) ...[
