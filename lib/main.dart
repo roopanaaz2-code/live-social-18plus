@@ -60,7 +60,7 @@ class NightLinkApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
+      debugShowCheckedModeBanner: false,\n      navigatorKey: nightLinkNavigatorKey,
       title: 'NightLink Live',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: dark,
