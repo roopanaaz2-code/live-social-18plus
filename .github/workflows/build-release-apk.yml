@@ -186,7 +186,7 @@ jobs:
           disable-animations: true
           script: |
             set -euo pipefail
-            APK="$RUNNER_TEMP/nightlink/build/app/outputs/flutter-apk/app-release.apk"
+            APK="${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk"
             adb install -r "$APK"
             adb shell am force-stop com.nightlink.nightlink
             adb shell monkey -p com.nightlink.nightlink 1
