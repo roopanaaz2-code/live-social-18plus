@@ -20,7 +20,7 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
   int _balance = 0;
   List<Map<String, dynamic>> _packages = [];
   bool get _isDeveloper =>
-      _client.auth.currentUser?.email?.toLowerCase() == 'roopanaaz2@gmail.com';
+      _client.auth.currentUser?.id == 'fcdb86f2-1fce-4f7a-8d84-f1ace7df12cd';
   bool _loading = true;
   String? _error;
 
@@ -132,7 +132,7 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
                       style: TextStyle(color: Colors.white54, fontSize: 11, height: 1.5),
                     ),
                   ],
-                  if (_client.auth.currentUser?.email?.toLowerCase() == 'roopanaaz2@gmail.com') ...[
+                  if (_client.auth.currentUser?.id == 'fcdb86f2-1fce-4f7a-8d84-f1ace7df12cd') ...[
                     const SizedBox(height: 22),
                     Card(
                       color: const Color(0xFF17233D),
