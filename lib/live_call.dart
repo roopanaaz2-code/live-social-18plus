@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 const _gold = Color(0xFFFFC857);
 const _blue = Color(0xFF2589FF);
-const _dark = Color(0xFF090D18);
+const _dark = Color(0xFF090D18);\n\nfinal GlobalKey<NavigatorState> nightLinkNavigatorKey = GlobalKey<NavigatorState>();
 
 enum NightLinkCallMode { voice, video }
 
@@ -264,7 +264,7 @@ class _IncomingCallOverlayState extends State<IncomingCallOverlay> {
         final mode = invite['call_mode'] == 'video'
             ? NightLinkCallMode.video
             : NightLinkCallMode.voice;
-        await Navigator.of(context).push(MaterialPageRoute(
+        await nightLinkNavigatorKey.currentState?.push(MaterialPageRoute(
           builder: (_) => LiveCallScreen(
             mode: mode,
             otherName: _callerName,
