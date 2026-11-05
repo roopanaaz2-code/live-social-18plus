@@ -289,7 +289,7 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
   }
 
   bool get _isDeveloper =>
-      _db.auth.currentUser?.email?.toLowerCase() == 'roopanaaz2@gmail.com';
+      _db.auth.currentUser?.id == 'fcdb86f2-1fce-4f7a-8d84-f1ace7df12cd';
 
   Future<void> _showGiftPicker() async {
     if (_players.isEmpty) return;
