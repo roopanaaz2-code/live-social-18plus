@@ -191,6 +191,12 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
         table: 'battle_scores',
         callback: (_) => _refreshData(),
       )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'profile_likes',
+        callback: (_) => _refreshData(),
+      )
       .subscribe();
   }
 
