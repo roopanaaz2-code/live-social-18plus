@@ -30,32 +30,55 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   if (supabaseKey.isEmpty) {
-    runApp(const SetupErrorApp());
+    runApp(const SetupErrorApp(
+      message: 'Supabase key is missing. Check GitHub Actions variables.',
+    ));
     return;
   }
 
-  await Supabase.initialize(
-    url: supabaseUrl,
-    publishableKey: supabaseKey,
-  );
-  await initializeNightLinkAds();
+  try {
+    await Supabase.initialize(
+      url: supabaseUrl,
+      publishableKey: supabaseKey,
+    );
+  } catch (error, stackTrace) {
+    debugPrint('NightLink Supabase startup failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+    runApp(SetupErrorApp(
+      message: 'NightLink could not initialize its backend.\\n\\n$error',
+    ));
+    return;
+  }
+
+  // Ads are optional and must never prevent the core app from opening.
+  try {
+    await initializeNightLinkAds();
+  } catch (error, stackTrace) {
+    debugPrint('NightLink optional ads initialization failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
 
   runApp(const NightLinkApp());
 }
 
 class SetupErrorApp extends StatelessWidget {
-  const SetupErrorApp({super.key});
+  const SetupErrorApp({super.key, required this.message});
+
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       home: Scaffold(
         backgroundColor: dark,
         body: Center(
-          child: Text(
-            'Supabase key is missing.\nCheck GitHub Actions variables.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: gold),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: SelectableText(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: gold, height: 1.5),
+            ),
           ),
         ),
       ),
