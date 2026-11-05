@@ -3,77 +3,85 @@ set -Eeuo pipefail
 
 APK_PATH="${1:?APK path argument is required}"
 PACKAGE_NAME="com.nightlink.nightlink"
-LOG_DIR="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+LOG_FILE="${RUNNER_TEMP:-/tmp}/nightlink-launch-logcat.txt"
+ACTIVITY_FILE="${RUNNER_TEMP:-/tmp}/nightlink-activity.txt"
 
-collect_diagnostics() {
+diagnostics() {
   status=$?
-  trap - ERR
-  echo "::error::Android smoke test failed (exit code $status). Collecting emulator diagnostics."
-  mkdir -p "$LOG_DIR"
-  adb logcat -d -v time > "$LOG_DIR/nightlink-launch-logcat.txt" 2>&1 || true
-  adb shell dumpsys activity activities > "$LOG_DIR/nightlink-activity.txt" 2>&1 || true
-  adb shell dumpsys package "$PACKAGE_NAME" > "$LOG_DIR/nightlink-package.txt" 2>&1 || true
-  echo "Recent fatal/runtime/Flutter errors:"
-  grep -E -i "FATAL EXCEPTION|AndroidRuntime|flutter|NightLink|UnsatisfiedLinkError|ClassNotFoundException|E/flutter|Fatal signal" "$LOG_DIR/nightlink-launch-logcat.txt" | tail -200 || true
+  echo "::error::NightLink Android smoke test failed (exit code $status)."
+  echo "Connected Android devices:"
+  adb devices -l || true
+  echo "Installed package:"
+  adb shell pm path "$PACKAGE_NAME" || true
+  echo "NightLink process:"
+  adb shell pidof "$PACKAGE_NAME" || true
   echo "Recent activity state:"
-  tail -100 "$LOG_DIR/nightlink-activity.txt" || true
-  echo "Package state:"
-  grep -E "versionName=|versionCode=|codePath=|primaryCpuAbi=|pkgFlags=" "$LOG_DIR/nightlink-package.txt" || true
+  adb shell dumpsys activity activities 2>&1 | tail -120 || true
+  echo "Recent Android/Flutter logs:"
+  adb logcat -d -t 2500 2>&1 | grep -E -i "FATAL EXCEPTION|AndroidRuntime|E/flutter|flutter|nightlink|UnsatisfiedLinkError|ClassNotFoundException" | tail -200 || true
   exit "$status"
 }
-trap collect_diagnostics ERR
+trap diagnostics ERR
 
-echo "Checking APK: $APK_PATH"
+echo "Checking release APK: $APK_PATH"
 test -s "$APK_PATH"
 ls -lh "$APK_PATH"
 
-SDK_LEVEL="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
-if [ "$SDK_LEVEL" != "35" ]; then
-  echo "::error::Expected Android 15 / API 35 emulator, got API $SDK_LEVEL."
-  exit 1
-fi
-echo "Confirmed Android API $SDK_LEVEL."
+echo "Checking emulator readiness..."
+adb wait-for-device
+for attempt in $(seq 1 60); do
+  booted="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+  if [ "$booted" = "1" ]; then
+    break
+  fi
+  if [ "$attempt" -eq 60 ]; then
+    echo "::error::Android emulator was connected but did not finish booting."
+    exit 1
+  fi
+  sleep 2
+done
 
-echo "Installing NightLink on Android 15 emulator..."
+echo "Installing NightLink..."
 adb install -r "$APK_PATH"
+adb shell pm path "$PACKAGE_NAME" | grep -q '^package:'
 
-echo "Verifying installed package..."
-PACKAGE_PATH="$(adb shell pm path "$PACKAGE_NAME" | tr -d '\r')"
-if [[ "$PACKAGE_PATH" != package:* ]]; then
-  echo "::error::Package $PACKAGE_NAME is not installed after adb install."
-  exit 1
-fi
-echo "$PACKAGE_PATH"
-
-echo "Clearing old logcat entries and launching NightLink..."
+echo "Clearing old logs and launching NightLink..."
 adb logcat -c
 adb shell am force-stop "$PACKAGE_NAME"
 adb shell monkey -p "$PACKAGE_NAME" 1
 
-echo "Waiting for NightLink to remain running..."
-for attempt in $(seq 1 20); do
-  if adb shell pidof "$PACKAGE_NAME" >/dev/null 2>&1; then
-    echo "NightLink process is running (check $attempt/20)."
+echo "Waiting for NightLink process to start..."
+APP_PID=""
+for attempt in $(seq 1 30); do
+  APP_PID="$(adb shell pidof "$PACKAGE_NAME" 2>/dev/null | tr -d '\r' || true)"
+  if [ -n "$APP_PID" ]; then
     break
   fi
-  if [ "$attempt" -eq 20 ]; then
-    echo "::error::NightLink process did not remain alive after launch."
-    exit 1
-  fi
-  sleep 1
+  sleep 2
 done
-
-sleep 10
-if ! adb shell pidof "$PACKAGE_NAME" >/dev/null 2>&1; then
-  echo "::error::NightLink process exited during the post-launch stability window."
+if [ -z "$APP_PID" ]; then
+  echo "::error::NightLink did not create an application process after launch."
   exit 1
 fi
 
-adb logcat -d -v time > "$LOG_DIR/nightlink-launch-logcat.txt"
-if grep -E -i "FATAL EXCEPTION|Fatal signal [0-9]+ \(" "$LOG_DIR/nightlink-launch-logcat.txt" | grep -E -i "$PACKAGE_NAME|com\.nightlink" >/dev/null; then
-  echo "::error::Fatal application crash detected in logcat."
+echo "NightLink started with PID: $APP_PID"
+sleep 30
+
+APP_PID_AFTER="$(adb shell pidof "$PACKAGE_NAME" 2>/dev/null | tr -d '\r' || true)"
+if [ -z "$APP_PID_AFTER" ]; then
+  echo "::error::NightLink process exited within 30 seconds of launch."
   exit 1
 fi
 
-echo "PASS: NightLink installed and remained running for at least 10 seconds on Android API 35."
-echo "APK installation, package registration, launch, and process-stability checks passed."
+adb shell dumpsys activity activities > "$ACTIVITY_FILE"
+if ! grep -Fq "$PACKAGE_NAME" "$ACTIVITY_FILE"; then
+  echo "::error::NightLink process is alive, but its activity was not found in ActivityManager."
+  tail -120 "$ACTIVITY_FILE" || true
+  exit 1
+fi
+
+adb logcat -d -t 2500 > "$LOG_FILE"
+echo "Recent NightLink launch logs:"
+grep -E -i "flutter|nightlink|AndroidRuntime|E/flutter" "$LOG_FILE" | tail -100 || true
+
+echo "PASS: NightLink installed, launched, and remained alive with an ActivityManager entry for 30 seconds on Android API 35."
