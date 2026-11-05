@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'connections.dart';
+
 const _gold = Color(0xFFFFC857);
 const _blue = Color(0xFF2589FF);
 const _dark = Color(0xFF090D18);
@@ -36,11 +38,19 @@ class _CallContactsScreenState extends State<CallContactsScreen> {
     final currentUser = _client.auth.currentUser;
     if (currentUser == null) return;
     try {
-      final rows = await _client
-          .from('profiles')
-          .select('id, username, display_name')
-          .neq('id', currentUser.id)
-          .order('display_name');
+      final links = await _client.from('friendships')
+          .select('user_low_id, user_high_id')
+          .or('user_low_id.eq.${currentUser.id},user_high_id.eq.${currentUser.id}');
+      final ids = (links as List).map((row) {
+        final low = row['user_low_id'].toString();
+        final high = row['user_high_id'].toString();
+        return low == currentUser.id ? high : low;
+      }).toList();
+      final rows = ids.isEmpty
+          ? <Map<String, dynamic>>[]
+          : await _client.from('profiles')
+              .select('id, username, display_name')
+              .inFilter('id', ids).order('display_name');
       if (!mounted) return;
       setState(() {
         _people = List<Map<String, dynamic>>.from(rows);
@@ -76,6 +86,14 @@ class _CallContactsScreenState extends State<CallContactsScreen> {
             style: const TextStyle(color: _gold, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
+            tooltip: 'Find members',
+            onPressed: () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const ConnectionsScreen()));
+              _loadPeople();
+            },
+            icon: const Icon(Icons.person_search, color: _gold),
+          ),
+          IconButton(
             onPressed: _loadPeople,
             icon: const Icon(Icons.refresh, color: _blue),
           ),
@@ -95,7 +113,7 @@ class _CallContactsScreenState extends State<CallContactsScreen> {
                       child: Padding(
                         padding: EdgeInsets.all(26),
                         child: Text(
-                          'No other members are available yet. Invite someone to create a NightLink account, then refresh.',
+                          'No accepted connections yet. Use the people-search icon above to find a member and send a connection request.',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: Colors.white70, height: 1.5),
                         ),
@@ -551,9 +569,23 @@ class _LiveCallScreenState extends State<LiveCallScreen> {
       await room.connect(
         serverUrl,
         token,
-        roomOptions: const RoomOptions(adaptiveStream: true, dynacast: true),
+        roomOptions: RoomOptions(
+          adaptiveStream: true,
+          dynacast: true,
+          defaultAudioCaptureOptions: const AudioCaptureOptions(
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            highPassFilter: true,
+            voiceIsolation: true,
+            typingNoiseDetection: true,
+          ),
+        ),
       );
 
+      // Voice calls use the earpiece by default to reduce speaker-to-microphone echo.
+      // Video calls use the speaker so both participants are easier to hear.
+      await AudioManager.instance.setSpeakerOutputPreferred(_isVideo);
       await room.localParticipant?.setMicrophoneEnabled(true);
       if (_isVideo) {
         await room.localParticipant?.setCameraEnabled(true);
