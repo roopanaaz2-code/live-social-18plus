@@ -200,7 +200,7 @@ create policy vip_memberships_read_own on public.vip_memberships
 create or replace function public.has_vip_access()
 returns boolean language sql stable security definer set search_path = public as $$
   select auth.uid() is not null and (
-    lower(coalesce(auth.jwt() ->> 'email', '')) = 'roopanaaz2@gmail.com'
+    auth.uid() = 'fcdb86f2-1fce-4f7a-8d84-f1ace7df12cd'::uuid
     or exists (select 1 from public.vip_memberships v
       where v.user_id = auth.uid() and v.starts_at <= now()
         and (v.expires_at is null or v.expires_at > now()))
@@ -215,7 +215,7 @@ create or replace function public.send_battle_gift(
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   v_sender uuid := auth.uid();
-  v_is_owner boolean := lower(coalesce(auth.jwt() ->> 'email', '')) = 'roopanaaz2@gmail.com';
+  v_is_owner boolean := auth.uid() = 'fcdb86f2-1fce-4f7a-8d84-f1ace7df12cd'::uuid;
   v_gift public.gift_catalog%rowtype;
   v_team integer;
   v_cost integer;
