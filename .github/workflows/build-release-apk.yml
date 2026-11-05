@@ -121,10 +121,10 @@ jobs:
           if len(distribution_lines) != 1:
               raise SystemExit("Could not safely pin the Gradle wrapper.")
           wrapper_lines[distribution_lines[0]] = (
-              "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.11.1-all.zip"
+              "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-all.zip"
           )
           wrapper.write_text("\n".join(wrapper_lines) + "\n")
-          print("Pinned AGP 8.10.1, Kotlin 2.1.0, Gradle 8.11.1.")
+          print("Pinned AGP 8.10.1, Kotlin 2.1.0, Gradle 8.14.3.")
           PY
 
           chmod +x "$BUILD_DIR/android/gradlew"
