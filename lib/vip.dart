@@ -57,20 +57,15 @@ class _VipScreenState extends State<VipScreen> {
               child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.orangeAccent)),
             ),
             const SizedBox(height: 22),
-            for (final item in const [
-              ['No advertising', 'Enjoy NightLink without banner ads.'],
-              ['VIP profile badge', 'Show a special VIP status on your profile.'],
-              ['Exclusive profile styling', 'Stand out with premium profile presentation.'],
-              ['Priority community support', 'Get help with account and app issues.'],
-            ])
-              Card(
-                color: const Color(0xFF11182B),
-                child: ListTile(
-                  leading: const Icon(Icons.check_circle, color: _blue),
-                  title: Text(item[0], style: const TextStyle(color: _gold, fontWeight: FontWeight.bold)),
-                  subtitle: Text(item[1], style: const TextStyle(color: Colors.white60)),
-                ),
+            const Card(
+              color: Color(0xFF11182B),
+              child: ListTile(
+                leading: Icon(Icons.check_circle, color: _blue),
+                title: Text('Ad-free access', style: TextStyle(color: _gold, fontWeight: FontWeight.bold)),
+                subtitle: Text('VIP accounts do not receive NightLink banner ads.',
+                  style: TextStyle(color: Colors.white60)),
               ),
+            ),
             const SizedBox(height: 18),
             if (_active!)
               const Card(
