@@ -24,6 +24,7 @@ const supabaseKey = String.fromEnvironment(
 const gold = Color(0xFFFFC857);
 const blue = Color(0xFF2589FF);
 const dark = Color(0xFF090D18);
+const supportEmail = String.fromEnvironment('NIGHTLINK_SUPPORT_EMAIL');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -449,9 +450,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _contactUs() async {
+    if (supportEmail.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Support email is not configured yet.')),
+      );
+      return;
+    }
     final uri = Uri(
       scheme: 'mailto',
-      path: 'roopanaaz2@gmail.com',
+      path: supportEmail.trim(),
       queryParameters: {'subject': 'NightLink Support'},
     );
     final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
