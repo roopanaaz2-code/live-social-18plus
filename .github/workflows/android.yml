@@ -43,7 +43,7 @@ jobs:
 
       - name: Add NightLink app code
         run: |
-          cp lib/main.dart "$RUNNER_TEMP/nightlink/lib/main.dart"
+          cp -R lib/. "$RUNNER_TEMP/nightlink/lib/"
 
       - name: Install Supabase dependency
         working-directory: ${{ runner.temp }}/nightlink

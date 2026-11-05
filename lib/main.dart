@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'matchmaking.dart';
+
 const supabaseUrl = String.fromEnvironment(
   'SUPABASE_URL',
   defaultValue: 'https://falimxmpicqaakjnigkv.supabase.co',
@@ -443,17 +445,33 @@ class HomeScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(color: blue, letterSpacing: 1),
               ),
-              const SizedBox(height: 25),
-              const Text(
-                'Discover • Messages • Live Battles • Profile',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: gold,
+                    foregroundColor: dark,
+                  ),
+                  icon: const Icon(Icons.sports_esports),
+                  label: const Text(
+                    'FIND A MATCH',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const MatchLobby()),
+                    );
+                  },
+                ),
               ),
               const SizedBox(height: 15),
               const Text(
-                'More live features are coming in the next updates.',
+                'Text, voice, and video rooms connect to the match after the room service is configured.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white38),
+                style: TextStyle(color: Colors.white38, height: 1.4),
               ),
             ],
           ),
