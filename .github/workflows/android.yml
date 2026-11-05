@@ -66,14 +66,18 @@ jobs:
           cat >> "$RUNNER_TEMP/nightlink/android/build.gradle.kts" <<'KOTLIN'
 
           subprojects {
-              tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-                  compilerOptions {
-                      jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+              // Android plugins can reset Java compatibility while applying their
+              // own Gradle configuration. Apply the final targets after evaluation.
+              afterEvaluate {
+                  tasks.withType<JavaCompile>().configureEach {
+                      sourceCompatibility = JavaVersion.VERSION_17.toString()
+                      targetCompatibility = JavaVersion.VERSION_17.toString()
                   }
-              }
-              tasks.withType<JavaCompile>().configureEach {
-                  sourceCompatibility = JavaVersion.VERSION_17.toString()
-                  targetCompatibility = JavaVersion.VERSION_17.toString()
+                  tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+                      compilerOptions {
+                          jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+                      }
+                  }
               }
           }
           KOTLIN
