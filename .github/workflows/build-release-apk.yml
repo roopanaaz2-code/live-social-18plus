@@ -203,7 +203,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          APK="$RUNNER_TEMP/nightlink/build/app/outputs/flutter-apk/app-release.apk"
+          APK="${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk"
           test -s "$APK" || {
             echo "Release APK was not generated or is empty." >&2
             exit 1
