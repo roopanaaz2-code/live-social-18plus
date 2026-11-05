@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'battle_room.dart';
+
 const _gold = Color(0xFFFFC857);
 const _blue = Color(0xFF2589FF);
 const _dark = Color(0xFF090D18);
@@ -111,6 +113,11 @@ class MatchmakingService {
         params: {'p_match_id': matchId},
       );
 
+  Future<List<Map<String, dynamic>>> liveBattles() async {
+    final response = await _client.rpc('get_live_battles');
+    return _asRows(response);
+  }
+
   static List<Map<String, dynamic>> _asRows(dynamic response) {
     if (response is! List) return const [];
     return response
@@ -133,6 +140,7 @@ class _MatchLobbyState extends State<MatchLobby> {
   MatchFormat? _searchingFor;
   QueueResult? _queueResult;
   ActiveMatch? _activeMatch;
+  List<Map<String, dynamic>> _liveBattles = [];
   String? _error;
   bool _busy = false;
 
@@ -152,10 +160,13 @@ class _MatchLobbyState extends State<MatchLobby> {
   Future<void> _refreshMatch() async {
     if (!mounted || _busy) return;
     try {
-      final match = await _service.activeMatch();
+      final results = await Future.wait([_service.activeMatch(), _service.liveBattles()]);
+      final match = results[0] as ActiveMatch?;
+      final liveBattles = results[1] as List<Map<String, dynamic>>;
       if (!mounted) return;
       setState(() {
         _activeMatch = match;
+        _liveBattles = liveBattles;
         if (match != null) _searchingFor = null;
       });
     } catch (error) {
@@ -222,6 +233,12 @@ class _MatchLobbyState extends State<MatchLobby> {
     }
   }
 
+  void _enterBattle(String matchId) {
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => BattleRoomScreen(matchId: matchId),
+    )).then((_) => _refreshMatch());
+  }
+
   Future<void> _leaveMatch() async {
     final match = _activeMatch;
     if (match == null) return;
@@ -271,7 +288,26 @@ class _MatchLobbyState extends State<MatchLobby> {
               busy: _busy,
               onReady: _ready,
               onLeave: _leaveMatch,
+              onEnter: () => _enterBattle(match.id),
             ),
+          if (_liveBattles.isNotEmpty) ...[
+            const Padding(
+              padding: EdgeInsets.only(top: 14, bottom: 8),
+              child: Text('LIVE BATTLES • WATCH NOW', style: TextStyle(color: _gold, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+            ),
+            for (final battle in _liveBattles)
+              if (battle['match_id']?.toString() != match?.id)
+                Card(
+                  color: const Color(0xFF17233A),
+                  child: ListTile(
+                    leading: const Icon(Icons.live_tv, color: Colors.redAccent),
+                    title: Text('${battle['mode'] ?? 'PK'} LIVE', style: const TextStyle(color: _gold, fontWeight: FontWeight.bold)),
+                    subtitle: Text('${(battle['players'] as List? ?? []).length} players • viewers can comment and send gifts', style: const TextStyle(color: Colors.white60)),
+                    trailing: const Text('WATCH', style: TextStyle(color: _blue, fontWeight: FontWeight.bold)),
+                    onTap: () => _enterBattle(battle['match_id'].toString()),
+                  ),
+                ),
+          ],
           for (final format in MatchFormat.values)
             _FormatCard(
               format: format,
@@ -347,12 +383,13 @@ class _QueueCard extends StatelessWidget {
 }
 
 class _MatchCard extends StatelessWidget {
-  const _MatchCard({required this.match, required this.busy, required this.onReady, required this.onLeave});
+  const _MatchCard({required this.match, required this.busy, required this.onReady, required this.onLeave, required this.onEnter});
 
   final ActiveMatch match;
   final bool busy;
   final VoidCallback onReady;
   final VoidCallback onLeave;
+  final VoidCallback onEnter;
 
   @override
   Widget build(BuildContext context) {
@@ -367,7 +404,11 @@ class _MatchCard extends StatelessWidget {
           Text('${match.mode}  •  ${match.playerCount}/${match.maxPlayers} players', style: const TextStyle(color: Colors.white70)),
           const SizedBox(height: 14),
           if (!live) ElevatedButton(onPressed: busy ? null : onReady, child: const Text('I AM READY')),
-          if (live) const Text('All players are ready. Connect your room to start the game.', style: TextStyle(color: Colors.white70)),
+          if (live) SizedBox(width: double.infinity, child: ElevatedButton.icon(
+            onPressed: busy ? null : onEnter,
+            icon: const Icon(Icons.videocam),
+            label: const Text('ENTER LIVE VIDEO BATTLE'),
+          )),
           TextButton(onPressed: busy ? null : onLeave, child: const Text('LEAVE MATCH')),
         ]),
       ),
