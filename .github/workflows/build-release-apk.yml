@@ -184,20 +184,8 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          script: |
-            set -euo pipefail
-            APK="${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk"
-            adb install -r "$APK"
-            adb shell am force-stop com.nightlink.nightlink
-            adb shell monkey -p com.nightlink.nightlink 1
-            sleep 20
-            if ! adb shell pidof com.nightlink.nightlink >/dev/null; then
-              echo "NightLink process exited after launch. Recent Android logs:"
-              adb logcat -d -t 2500 | grep -E -i "FATAL EXCEPTION|AndroidRuntime|flutter|NightLink|UnsatisfiedLinkError|ClassNotFoundException" | tail -250 || true
-              exit 1
-            fi
-            echo "NightLink stayed running for 20 seconds on Android API 35."
-            adb logcat -d -t 500 | grep -E -i "FATAL EXCEPTION|AndroidRuntime|flutter|NightLink" | tail -80 || true
+          script: >-
+            set -euo pipefail; APK="${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk"; test -s "$APK"; adb install -r "$APK"; adb shell am force-stop com.nightlink.nightlink; adb shell monkey -p com.nightlink.nightlink 1; sleep 20; if ! adb shell pidof com.nightlink.nightlink >/dev/null; then echo "NightLink process exited after launch. Recent Android logs:"; adb logcat -d -t 2500 | grep -E -i "FATAL EXCEPTION|AndroidRuntime|flutter|NightLink|UnsatisfiedLinkError|ClassNotFoundException" | tail -250 || true; exit 1; fi; echo "NightLink stayed running for 20 seconds on Android API 35."; adb logcat -d -t 500 | grep -E -i "FATAL EXCEPTION|AndroidRuntime|flutter|NightLink" | tail -80 || true
 
       - name: Verify APK
         shell: bash
