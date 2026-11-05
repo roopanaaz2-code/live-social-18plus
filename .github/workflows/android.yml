@@ -55,11 +55,12 @@ jobs:
           manifest.write_text(text)
           PY
           # Align Kotlin compilation for every Android plugin with Java 11.
+          # Use the modern compilerOptions DSL (Kotlin 2.x).
           cat >> "$RUNNER_TEMP/nightlink/android/build.gradle.kts" <<'KOTLIN'
           
           subprojects {
               tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-                  kotlinOptions.jvmTarget = "11"
+                  compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
               }
           }
           KOTLIN
