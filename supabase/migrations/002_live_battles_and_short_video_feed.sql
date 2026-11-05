@@ -316,7 +316,7 @@ grant insert on public.video_post_interactions,public.video_post_comments to aut
 
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
 values
- ('nightlink-videos','nightlink-videos',true,104857600,array['video/mp4','video/quicktime','video/webm']),
+ ('nightlink-videos','nightlink-videos',true,52428800,array['video/mp4','video/quicktime','video/webm']),
  ('nightlink-audio','nightlink-audio',true,20971520,array['audio/mpeg','audio/mp4','audio/aac','audio/wav','audio/x-wav','audio/ogg'])
 on conflict(id) do update set public=excluded.public,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
 drop policy if exists nightlink_video_upload_own_folder on storage.objects;
