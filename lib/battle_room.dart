@@ -39,6 +39,7 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
   bool _isPlayer = false;
   bool _sendingComment = false;
   bool _finishing = false;
+  bool _finishErrorShown = false;
   bool _micEnabled = false;
   bool _cameraEnabled = false;
 
@@ -228,7 +229,9 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
       }
       await _refreshData();
     } catch (error) {
-      if (mounted) {
+      final message = error.toString();
+      if (mounted && !message.toLowerCase().contains('timer has not finished') && !_finishErrorShown) {
+        _finishErrorShown = true;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not finalize battle yet: $error')),
         );
