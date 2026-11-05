@@ -440,9 +440,9 @@ class _HomeScreenState extends State<HomeScreen> {
         _vipLoading = false;
       });
     } catch (_) {
-      final email = Supabase.instance.client.auth.currentUser?.email?.toLowerCase();
+      final userId = Supabase.instance.client.auth.currentUser?.id;
       if (mounted) setState(() {
-        _hasVip = email == 'roopanaaz2@gmail.com';
+        _hasVip = userId == 'fcdb86f2-1fce-4f7a-8d84-f1ace7df12cd';
         _vipLoading = false;
       });
     }
@@ -466,7 +466,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
     final name = _profileName ?? user?.userMetadata?['display_name'] ?? 'Member';
-    final hideAds = _hasVip || user?.email?.toLowerCase() == 'roopanaaz2@gmail.com';
+    final hideAds = _hasVip || user?.id == 'fcdb86f2-1fce-4f7a-8d84-f1ace7df12cd';
 
     return Scaffold(
       appBar: AppBar(
