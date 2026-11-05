@@ -403,8 +403,117 @@ class _LoginScreenState extends State<LoginScreen> {
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-
   @override
-  Widget build(BuildContext context) => const NightLinkFeedScreen();
+  Widget build(BuildContext context) {
+    final user = Supabase.instance.client.auth.currentUser;
+    final name = user?.userMetadata?['display_name'] ?? 'Member';
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: dark,
+        title: const Text('NIGHTLINK', style: TextStyle(color: gold, fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            tooltip: 'Sign out',
+            icon: const Icon(Icons.logout, color: blue),
+            onPressed: () async => Supabase.instance.client.auth.signOut(),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(22),
+        children: [
+          const SizedBox(height: 18),
+          const Icon(Icons.nightlight_round, color: gold, size: 58),
+          const SizedBox(height: 14),
+          Text('Welcome, $name!', textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(user?.email ?? '', textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white60)),
+          const SizedBox(height: 12),
+          const Text('CHOOSE HOW YOU WANT TO CONNECT',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: blue, letterSpacing: 1, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 22),
+          _HomeActionCard(
+            icon: Icons.play_circle_outline,
+            title: 'SHORT VIDEO FEED',
+            subtitle: 'Watch, upload and share short videos',
+            color: gold,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NightLinkFeedScreen())),
+          ),
+          const SizedBox(height: 12),
+          _HomeActionCard(
+            icon: Icons.chat_bubble_outline,
+            title: 'TEXT CHAT',
+            subtitle: 'Send private real-time messages',
+            color: gold,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen())),
+          ),
+          const SizedBox(height: 12),
+          _HomeActionCard(
+            icon: Icons.mic_none,
+            title: 'VOICE CHAT',
+            subtitle: 'Talk live with other members',
+            color: blue,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CallContactsScreen(mode: NightLinkCallMode.voice))),
+          ),
+          const SizedBox(height: 12),
+          _HomeActionCard(
+            icon: Icons.videocam_outlined,
+            title: 'VIDEO CHAT',
+            subtitle: 'Meet face-to-face in live rooms',
+            color: gold,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CallContactsScreen(mode: NightLinkCallMode.video))),
+          ),
+          const SizedBox(height: 12),
+          _HomeActionCard(
+            icon: Icons.monetization_on_outlined,
+            title: 'COINS & GIFTS',
+            subtitle: 'View your coin wallet and payment status',
+            color: gold,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CoinWalletScreen())),
+          ),
+          const SizedBox(height: 12),
+          _HomeActionCard(
+            icon: Icons.sports_esports,
+            title: 'FIND A MATCH',
+            subtitle: '1v1 duels and team battles',
+            color: blue,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MatchLobby())),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
+class _HomeActionCard extends StatelessWidget {
+  const _HomeActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Card(
+    color: const Color(0xFF11182B),
+    child: ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      leading: CircleAvatar(
+        backgroundColor: color.withOpacity(.14),
+        child: Icon(icon, color: color),
+      ),
+      title: Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+      subtitle: Text(subtitle, style: const TextStyle(color: Colors.white60)),
+      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white54),
+      onTap: onTap,
+    ),
+  );
+}
