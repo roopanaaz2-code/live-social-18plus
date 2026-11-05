@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: nightlink-release-apk-${{ github.ref }}
+  group: nightlink-release-apk-\${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -102,10 +102,10 @@ jobs:
       - name: Configure optional release signing
         shell: bash
         env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_BASE64: \${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: \${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: \${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: \${{ secrets.KEY_PASSWORD }}
         run: |
           set -euo pipefail
           present=0
@@ -146,11 +146,11 @@ jobs:
         working-directory: .nightlink-build
         shell: bash
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://falimxmpicqaakjnigkv.supabase.co' }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          SUPABASE_URL: \${{ secrets.SUPABASE_URL || 'https://falimxmpicqaakjnigkv.supabase.co' }}
+          SUPABASE_PUBLISHABLE_KEY: \${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          KEYSTORE_PASSWORD: \${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: \${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: \${{ secrets.KEY_PASSWORD }}
         run: |
           set -euo pipefail
           test -n "$SUPABASE_PUBLISHABLE_KEY" || { echo "SUPABASE_PUBLISHABLE_KEY secret is missing." >&2; exit 1; }
