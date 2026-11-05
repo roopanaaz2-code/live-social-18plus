@@ -461,3 +461,20 @@ revoke all on function public.finish_battle(uuid) from public,anon;
 grant execute on function public.finish_battle(uuid) to authenticated;
 revoke all on function public.get_live_battles() from public,anon;
 grant execute on function public.get_live_battles() to authenticated;
+
+
+-- Keep matchmaking SECURITY DEFINER RPCs unavailable to unauthenticated clients.
+revoke all on function public.get_my_active_match() from public, anon;
+grant execute on function public.get_my_active_match() to authenticated;
+revoke all on function public.is_match_participant(uuid,uuid) from public, anon;
+grant execute on function public.is_match_participant(uuid,uuid) to authenticated;
+revoke all on function public.join_matchmaking(text) from public, anon;
+grant execute on function public.join_matchmaking(text) to authenticated;
+revoke all on function public.leave_match(uuid) from public, anon;
+grant execute on function public.leave_match(uuid) to authenticated;
+revoke all on function public.leave_matchmaking() from public, anon;
+grant execute on function public.leave_matchmaking() to authenticated;
+revoke all on function public.set_match_ready(uuid) from public, anon;
+grant execute on function public.set_match_ready(uuid) to authenticated;
+revoke all on function public.handle_new_user() from public, anon, authenticated;
+revoke all on function public.rls_auto_enable() from public, anon, authenticated;
