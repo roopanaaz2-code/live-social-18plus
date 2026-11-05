@@ -82,8 +82,13 @@ jobs:
                   "\n".join(missing) + "\n    <application",
                   1,
               )
+          # The Google Mobile Ads SDK installs a startup ContentProvider that
+          # requires an application ID even when ads are disabled in Dart.
+          # Use the official Google test app ID until a real AdMob ID is configured.
           app_id = os.environ.get("ADMOB_ANDROID_APP_ID", "").strip()
-          if app_id and "com.google.android.gms.ads.APPLICATION_ID" not in content:
+          if not app_id:
+              app_id = "ca-app-pub-3940256099942544~3347511713"
+          if "com.google.android.gms.ads.APPLICATION_ID" not in content:
               metadata = (
                   '        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" '
                   f'android:value="{app_id}" />\n'
