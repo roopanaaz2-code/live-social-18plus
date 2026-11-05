@@ -61,7 +61,7 @@ jobs:
           if tags:
               content = content.replace(
                   "<application",
-                  "\\n".join(tags) + "\\n    <application",
+                  "\n".join(tags) + "\n    <application",
                   1,
               )
           manifest.write_text(content)
