@@ -84,7 +84,7 @@ jobs:
           if app_id and "com.google.android.gms.ads.APPLICATION_ID" not in content:
               metadata = (
                   '        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" '
-                  f'android:value="{app_id}" />\\n'
+                  f'android:value="{app_id}" />\n'
               )
               content = content.replace("</application>", metadata + "    </application>", 1)
           manifest.write_text(content)
