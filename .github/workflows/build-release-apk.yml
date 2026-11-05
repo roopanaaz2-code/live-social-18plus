@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: nightlink-release-apk-${{ github.ref }}
+  group: nightlink-release-apk-\${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -31,11 +31,15 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.47.9'
           cache: true
 
-      - name: Show versions
-        run: flutter --version
+      - name: Show toolchain versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter --version
+          java -version
 
       - name: Generate Android host project
         shell: bash
@@ -43,15 +47,27 @@ jobs:
           set -euo pipefail
           BUILD_DIR="$GITHUB_WORKSPACE/.nightlink-build"
           flutter create --project-name nightlink --org com.nightlink "$BUILD_DIR"
+          test -f "$BUILD_DIR/android/settings.gradle.kts" -o -f "$BUILD_DIR/android/settings.gradle"
+          test -f "$BUILD_DIR/android/gradle/wrapper/gradle-wrapper.properties"
+          test -f "$BUILD_DIR/android/app/build.gradle.kts" -o -f "$BUILD_DIR/android/app/build.gradle"
+          chmod +x "$BUILD_DIR/android/gradlew"
           cp -R lib/. "$BUILD_DIR/lib/"
 
-          # 1) Manifest permissions
+          # Keep the generated Flutter/Android toolchain versions together.
+          # Do not downgrade AGP, Kotlin, or Gradle independently.
+          echo "Generated Android plugin versions:"
+          grep -E 'com.android.application|org.jetbrains.kotlin.android' "$BUILD_DIR/android/settings.gradle.kts" "$BUILD_DIR/android/settings.gradle" 2>/dev/null || true
+          echo "Generated Gradle wrapper:"
+          grep '^distributionUrl=' "$BUILD_DIR/android/gradle/wrapper/gradle-wrapper.properties"
+
+          # Add only the Android permissions required by NightLink.
           python3 - "$BUILD_DIR/android/app/src/main/AndroidManifest.xml" <<'PY'
           import sys
           from pathlib import Path
-          p = Path(sys.argv[1])
-          c = p.read_text()
-          perms = [
+
+          manifest = Path(sys.argv[1])
+          content = manifest.read_text()
+          permissions = [
               "android.permission.INTERNET",
               "android.permission.CAMERA",
               "android.permission.RECORD_AUDIO",
@@ -59,41 +75,41 @@ jobs:
               "android.permission.CHANGE_NETWORK_STATE",
               "android.permission.MODIFY_AUDIO_SETTINGS",
           ]
-          tags = [f'    <uses-permission android:name="{n}" />' for n in perms if n not in c]
-          if tags:
-              c = c.replace("<application", "\n".join(tags) + "\n    <application", 1)
-          p.write_text(c)
+          missing = [
+              f'    <uses-permission android:name="{name}" />'
+              for name in permissions
+              if name not in content
+          ]
+          if missing:
+              if "<application" not in content:
+                  raise SystemExit("AndroidManifest.xml has no <application> element")
+              content = content.replace(
+                  "<application",
+                  "\n".join(missing) + "\n    <application",
+                  1,
+              )
+              manifest.write_text(content)
           PY
 
-          # 2) Gradle properties
-          cat >> "$BUILD_DIR/android/gradle.properties" <<'EOF'
-          kotlin.jvm.target.validation.mode=warning
-          android.newDsl=false
-          android.builtInKotlin=false
-          org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g
-          EOF
-
-          # 3) Pin AGP / Kotlin / Gradle
-          python3 - "$BUILD_DIR/android" <<'PY'
-          import re, sys
-          from pathlib import Path
-          android = Path(sys.argv[1])
-          settings = next((p for p in (android/"settings.gradle.kts", android/"settings.gradle") if p.exists()), None)
-          if settings:
-              t = settings.read_text()
-              t, a = re.subn(r"""(id\s*\(?\s*["']com\.android\.application["']\s*\)?\s+version\s+["'])[^"']+(["'])""", r"\g<1>8.10.1\2", t)
-              t, k = re.subn(r"""(id\s*\(?\s*["']org\.jetbrains\.kotlin\.android["']\s*\)?\s+version\s+["'])[^"']+(["'])""", r"\g<1>2.1.0\2", t)
-              settings.write_text(t)
-              print(f"settings patched: AGP={a} Kotlin={k}")
-          w = android/"gradle/wrapper/gradle-wrapper.properties"
-          lines = w.read_text().splitlines()
-          lines = [("distributionUrl=https\\://services.gradle.org/distributions/gradle-8.11.1-all.zip"
-                    if l.startswith("distributionUrl=") else l) for l in lines]
-          w.write_text("\n".join(lines) + "\n")
-          PY
+          # Preserve the legacy Kotlin plugin while using the generated AGP version.
+          PROPERTIES="$BUILD_DIR/android/gradle.properties"
+          touch "$PROPERTIES"
+          for entry in \
+            "android.newDsl=false" \
+            "android.builtInKotlin=false" \
+            "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g"
+          do
+            key="\${entry%%=*}"
+            if grep -qE "^$key=" "$PROPERTIES"; then
+              sed -i "s|^$key=.*|$entry|" "$PROPERTIES"
+            else
+              printf '%s\n' "$entry" >> "$PROPERTIES"
+            fi
+          done
 
       - name: Resolve Flutter dependencies
         working-directory: .nightlink-build
+        shell: bash
         run: |
           set -euo pipefail
           flutter pub add supabase_flutter livekit_client:^2.13.2 url_launcher image_picker video_player just_audio file_picker share_plus:^10.1.4
@@ -102,26 +118,32 @@ jobs:
       - name: Configure optional release signing
         shell: bash
         env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_BASE64: \${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: \${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: \${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: \${{ secrets.KEY_PASSWORD }}
         run: |
           set -euo pipefail
           present=0
-          for v in "$KEYSTORE_BASE64" "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD"; do
-            if [[ -n "$v" ]]; then present=$((present + 1)); fi
+          for value in "$KEYSTORE_BASE64" "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD"; do
+            if [[ -n "$value" ]]; then present=$((present + 1)); fi
           done
+
           if [[ "$present" -eq 0 ]]; then
-            echo "No signing secrets; using debug keystore fallback."
+            echo "No release-signing secrets found; Flutter will use its generated debug keystore."
           elif [[ "$present" -ne 4 ]]; then
-            echo "All four signing secrets are required together." >&2
+            echo "Incomplete signing configuration: provide all four keystore secrets or none." >&2
             exit 1
           else
             KEYSTORE_PATH="$RUNNER_TEMP/nightlink-release.jks"
-            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
-            test -s "$KEYSTORE_PATH"
+            if ! printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"; then
+              echo "KEYSTORE_BASE64 is not valid Base64. Re-create it from the .jks file." >&2
+              exit 1
+            fi
+            test -s "$KEYSTORE_PATH" || { echo "Decoded keystore is empty." >&2; exit 1; }
+            keytool -list -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
             echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+
             cat >> "$GITHUB_WORKSPACE/.nightlink-build/android/app/build.gradle.kts" <<'KOTLIN'
 
           android {
@@ -146,15 +168,12 @@ jobs:
         working-directory: .nightlink-build
         shell: bash
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://falimxmpicqaakjnigkv.supabase.co' }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          SUPABASE_URL: \${{ secrets.SUPABASE_URL || 'https://falimxmpicqaakjnigkv.supabase.co' }}
+          SUPABASE_PUBLISHABLE_KEY: \${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
         run: |
           set -euo pipefail
           test -n "$SUPABASE_PUBLISHABLE_KEY" || { echo "SUPABASE_PUBLISHABLE_KEY secret is missing." >&2; exit 1; }
-          flutter build apk --release -v \
+          flutter build apk --release --stacktrace \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
 
@@ -173,4 +192,3 @@ jobs:
           path: .nightlink-build/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
---- YAML END ---
