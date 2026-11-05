@@ -52,7 +52,8 @@ jobs:
           chmod +x "$BUILD_DIR/android/gradlew"
           cp -R lib/. "$BUILD_DIR/lib/"
 
-          python3 - "$BUILD_DIR/android/app/src/main/AndroidManifest.xml" <<'PY'
+          ADMOB_ANDROID_APP_ID="${{ secrets.ADMOB_ANDROID_APP_ID }}" python3 - "$BUILD_DIR/android/app/src/main/AndroidManifest.xml" <<'PY'
+          import os
           import sys
           from pathlib import Path
 
@@ -79,7 +80,14 @@ jobs:
                   "\n".join(missing) + "\n    <application",
                   1,
               )
-              manifest.write_text(content)
+          app_id = os.environ.get("ADMOB_ANDROID_APP_ID", "").strip()
+          if app_id and "com.google.android.gms.ads.APPLICATION_ID" not in content:
+              metadata = (
+                  '        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" '
+                  f'android:value="{app_id}" />\\n'
+              )
+              content = content.replace("</application>", metadata + "    </application>", 1)
+          manifest.write_text(content)
           PY
 
           echo "Generated Gradle wrapper:"
@@ -120,7 +128,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          flutter pub add supabase_flutter livekit_client:^2.13.2 url_launcher image_picker video_player just_audio file_picker:10.3.3 share_plus:^10.1.4
+          flutter pub add supabase_flutter livekit_client:^2.13.2 url_launcher image_picker video_player just_audio file_picker:10.3.3 share_plus:^10.1.4 google_mobile_ads:9.0.0
           flutter pub get
 
       - name: Check Supabase configuration
@@ -140,11 +148,15 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://falimxmpicqaakjnigkv.supabase.co' }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          ADMOB_ANDROID_APP_ID: ${{ secrets.ADMOB_ANDROID_APP_ID }}
+          ADMOB_BANNER_AD_UNIT_ID: ${{ secrets.ADMOB_BANNER_AD_UNIT_ID }}
         run: |
           set -euo pipefail
           flutter build apk --release -v \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
+            --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY" \
+            --dart-define=ADMOB_ANDROID_APP_ID="$ADMOB_ANDROID_APP_ID" \
+            --dart-define=ADMOB_BANNER_AD_UNIT_ID="$ADMOB_BANNER_AD_UNIT_ID"
 
       - name: Verify APK
         shell: bash
