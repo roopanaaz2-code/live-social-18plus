@@ -104,7 +104,7 @@ jobs:
           text = settings.read_text()
           agp_pattern = r"""(id\s*\(?\s*["']com\.android\.application["']\s*\)?\s+version\s+["'])[^"']+(["'])"""
           kotlin_pattern = r"""(id\s*\(?\s*["']org\.jetbrains\.kotlin\.android["']\s*\)?\s+version\s+["'])[^"']+(["'])"""
-          text, agp_count = re.subn(agp_pattern, r"\g<1>8.10.1\2", text)
+          text, agp_count = re.subn(agp_pattern, r"\g<1>8.11.1\2", text)
           text, kotlin_count = re.subn(kotlin_pattern, r"\g<1>2.1.0\2", text)
           if agp_count != 1 or kotlin_count != 1:
               raise SystemExit(
@@ -124,7 +124,7 @@ jobs:
               "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-all.zip"
           )
           wrapper.write_text("\n".join(wrapper_lines) + "\n")
-          print("Pinned AGP 8.10.1, Kotlin 2.1.0, Gradle 8.14.3.")
+          print("Pinned AGP 8.11.1, Kotlin 2.1.0, Gradle 8.14.3.")
           PY
 
           chmod +x "$BUILD_DIR/android/gradlew"
