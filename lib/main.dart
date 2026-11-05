@@ -1,6 +1,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import 'ads.dart';
+import 'connections.dart';
+import 'vip.dart';
 
 import 'matchmaking.dart';
 import 'chat.dart';
@@ -32,6 +37,7 @@ Future<void> main() async {
     url: supabaseUrl,
     publishableKey: supabaseKey,
   );
+  await initializeNightLinkAds();
 
   runApp(const NightLinkApp());
 }
@@ -401,12 +407,56 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  bool _vipLoading = true;
+  bool _hasVip = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVip();
+  }
+
+  Future<void> _loadVip() async {
+    try {
+      final value = await Supabase.instance.client.rpc('has_vip_access');
+      if (mounted) setState(() { _hasVip = value == true; _vipLoading = false; });
+    } catch (_) {
+      final email = Supabase.instance.client.auth.currentUser?.email?.toLowerCase();
+      if (mounted) setState(() {
+        _hasVip = email == 'roopanaaz2@gmail.com';
+        _vipLoading = false;
+      });
+    }
+  }
+
+  Future<void> _contactUs() async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: 'roopanaaz2@gmail.com',
+      queryParameters: {'subject': 'NightLink Support'},
+    );
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No email app is available on this device.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
     final name = user?.userMetadata?['display_name'] ?? 'Member';
+    final hideAds = _hasVip || user?.email?.toLowerCase() == 'roopanaaz2@gmail.com';
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: dark,
@@ -427,14 +477,19 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: 14),
           Text('Welcome, $name!', textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text(user?.email ?? '', textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white60)),
           const SizedBox(height: 12),
           const Text('CHOOSE HOW YOU WANT TO CONNECT',
             textAlign: TextAlign.center,
             style: TextStyle(color: blue, letterSpacing: 1, fontWeight: FontWeight.bold)),
           const SizedBox(height: 22),
+          _HomeActionCard(
+            icon: Icons.person_search,
+            title: 'FIND PEOPLE & CONNECTIONS',
+            subtitle: 'Edit your username, search members and accept requests',
+            color: gold,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ConnectionsScreen())),
+          ),
+          const SizedBox(height: 12),
           _HomeActionCard(
             icon: Icons.play_circle_outline,
             title: 'SHORT VIDEO FEED',
@@ -446,7 +501,7 @@ class HomeScreen extends StatelessWidget {
           _HomeActionCard(
             icon: Icons.chat_bubble_outline,
             title: 'TEXT CHAT',
-            subtitle: 'Send private real-time messages',
+            subtitle: 'Chat privately with accepted connections',
             color: gold,
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen())),
           ),
@@ -454,7 +509,7 @@ class HomeScreen extends StatelessWidget {
           _HomeActionCard(
             icon: Icons.mic_none,
             title: 'VOICE CHAT',
-            subtitle: 'Talk live with other members',
+            subtitle: 'Talk live with accepted connections',
             color: blue,
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CallContactsScreen(mode: NightLinkCallMode.voice))),
           ),
@@ -462,7 +517,7 @@ class HomeScreen extends StatelessWidget {
           _HomeActionCard(
             icon: Icons.videocam_outlined,
             title: 'VIDEO CHAT',
-            subtitle: 'Meet face-to-face in live rooms',
+            subtitle: 'Meet face-to-face with accepted connections',
             color: gold,
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CallContactsScreen(mode: NightLinkCallMode.video))),
           ),
@@ -470,9 +525,17 @@ class HomeScreen extends StatelessWidget {
           _HomeActionCard(
             icon: Icons.monetization_on_outlined,
             title: 'COINS & GIFTS',
-            subtitle: 'View your coin wallet and payment status',
+            subtitle: 'View your coin wallet and gifts',
             color: gold,
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CoinWalletScreen())),
+          ),
+          const SizedBox(height: 12),
+          _HomeActionCard(
+            icon: Icons.workspace_premium,
+            title: 'VIP MEMBERSHIP',
+            subtitle: _hasVip ? 'VIP is active on this account' : 'Explore VIP benefits',
+            color: gold,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VipScreen())),
           ),
           const SizedBox(height: 12),
           _HomeActionCard(
@@ -482,6 +545,16 @@ class HomeScreen extends StatelessWidget {
             color: blue,
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MatchLobby())),
           ),
+          const SizedBox(height: 12),
+          _HomeActionCard(
+            icon: Icons.support_agent,
+            title: 'CONTACT US',
+            subtitle: 'Get help from NightLink support',
+            color: blue,
+            onTap: _contactUs,
+          ),
+          if (!_vipLoading)
+            NightLinkBannerAd(hide: hideAds),
         ],
       ),
     );
