@@ -6,7 +6,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 const _gold = Color(0xFFFFC857);
 const _blue = Color(0xFF2589FF);
-const _dark = Color(0xFF090D18);\n\nfinal GlobalKey<NavigatorState> nightLinkNavigatorKey = GlobalKey<NavigatorState>();
+const _dark = Color(0xFF090D18);
+
+final GlobalKey<NavigatorState> nightLinkNavigatorKey = GlobalKey<NavigatorState>();
 
 enum NightLinkCallMode { voice, video }
 
