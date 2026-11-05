@@ -47,7 +47,7 @@ jobs:
           for permission in permissions:
               permission_name = permission.split('name="')[1].split('"')[0]
               if permission_name not in text:
-                  text = text.replace('<application', permission + '\\n    <application', 1)
+                  text = text.replace('<application', permission + '\n    <application', 1)
           manifest.write_text(text)
           PY
 
