@@ -115,7 +115,7 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
                   ..._packages.map(_packageCard),
                   const SizedBox(height: 8),
                   const Text(
-                    'Coin purchases are temporarily paused. Your wallet and gift catalog are ready; a payment provider will be connected later.',
+                    'Coin purchases are temporarily paused. You can choose from the full gift catalog inside a live battle.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.white54, fontSize: 11, height: 1.5),
                   ),
