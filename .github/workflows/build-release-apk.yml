@@ -113,14 +113,22 @@ jobs:
 
           gradle_file = Path(sys.argv[1])
           content = gradle_file.read_text()
-          pattern = re.compile(
+          compile_pattern = re.compile(
               r"(?m)^(\s*compileSdk\s*=\s*)(?:flutter\.compileSdkVersion|\d+)\s*$"
           )
-          updated, count = pattern.subn(r"\g<1>36", content, count=1)
-          if count != 1:
+          updated, compile_count = compile_pattern.subn(r"\g<1>36", content, count=1)
+          if compile_count != 1:
               raise SystemExit("Could not safely locate the generated app compileSdk setting.")
+
+          min_pattern = re.compile(
+              r"(?m)^(\s*minSdk\s*=\s*)(?:flutter\.minSdkVersion|\d+)\s*$"
+          )
+          updated, min_count = min_pattern.subn(r"\g<1>24", updated, count=1)
+          if min_count != 1:
+              raise SystemExit("Could not safely locate the generated app minSdk setting.")
+
           gradle_file.write_text(updated)
-          print("Android app compileSdk set to 36.")
+          print("Android app compileSdk set to 36 and minSdk set to 24 for current Google Mobile Ads SDK.")
           PY
 
       - name: Resolve Flutter dependencies
