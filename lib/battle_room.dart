@@ -592,7 +592,9 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
               padding: const EdgeInsets.all(12),
               color: const Color(0xFF173A2B),
               child: Text(
-                'WINNER: TEAM ${_winner!['winner_team_no'] ?? '—'}',
+                _winner!['winner_team_no'] == null
+                    ? 'DRAW • SCORES TIED'
+                    : 'WINNER: TEAM ${_winner!['winner_team_no']}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: _gold, fontSize: 20, fontWeight: FontWeight.bold),
               ),
