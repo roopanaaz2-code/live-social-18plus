@@ -48,3 +48,7 @@ Add the real IDs under **GitHub → Settings → Secrets and variables → Actio
 ## VIP payments
 
 The developer account has lifetime VIP access. Paid VIP checkout for other members is intentionally not enabled until a real payment provider, merchant credentials and server-side payment verification are configured. No fake purchase buttons or unverified coin credits are used.
+
+## Private Contact Us recipient
+
+Set the GitHub Actions secret `NIGHTLINK_SUPPORT_EMAIL` to the support inbox address. The Contact Us button opens a pre-addressed email without displaying the recipient in the app UI. The compiled APK still contains the recipient needed by the mail app; a truly hidden recipient requires a server-side support form and email provider.
