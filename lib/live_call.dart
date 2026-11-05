@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -269,7 +271,7 @@ class _LiveCallScreenState extends State<LiveCallScreen> {
     if (room != null) {
       room.removeListener(_onRoomChanged);
       await room.disconnect();
-      room.dispose();
+      await room.dispose();
     }
     if (mounted) Navigator.pop(context);
   }
@@ -279,8 +281,7 @@ class _LiveCallScreenState extends State<LiveCallScreen> {
     final room = _room;
     if (room != null) {
       room.removeListener(_onRoomChanged);
-      room.disconnect();
-      room.dispose();
+      unawaited(room.disconnect().then((_) async { await room.dispose(); }));
     }
     super.dispose();
   }
