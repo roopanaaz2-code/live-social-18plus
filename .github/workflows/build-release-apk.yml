@@ -85,6 +85,24 @@ jobs:
           echo "Generated Gradle wrapper:"
           grep '^distributionUrl=' "$BUILD_DIR/android/gradle/wrapper/gradle-wrapper.properties"
 
+          # Align every Android plugin's Java and Kotlin compiler targets.
+          # Flutter plugins can otherwise default to Java 11 and Kotlin 1.8.
+          cat >> "$BUILD_DIR/android/build.gradle.kts" <<'KOTLIN'
+          gradle.projectsEvaluated {
+              allprojects {
+                  tasks.withType<JavaCompile>().configureEach {
+                      sourceCompatibility = JavaVersion.VERSION_17.toString()
+                      targetCompatibility = JavaVersion.VERSION_17.toString()
+                  }
+                  tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+                      compilerOptions {
+                          jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+                      }
+                  }
+              }
+          }
+          KOTLIN
+
       - name: Resolve Flutter dependencies
         working-directory: ${{ runner.temp }}/nightlink
         shell: bash
