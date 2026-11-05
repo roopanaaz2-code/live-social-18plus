@@ -417,6 +417,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool _vipLoading = true;
   bool _hasVip = false;
+  String? _profileName;
 
   @override
   void initState() {
@@ -426,8 +427,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadVip() async {
     try {
-      final value = await Supabase.instance.client.rpc('has_vip_access');
-      if (mounted) setState(() { _hasVip = value == true; _vipLoading = false; });
+      final client = Supabase.instance.client;
+      final values = await Future.wait([
+        client.rpc('has_vip_access'),
+        client.from('profiles').select('display_name')
+            .eq('id', client.auth.currentUser!.id).maybeSingle(),
+      ]);
+      final profile = values[1] as Map<String, dynamic>?;
+      if (mounted) setState(() {
+        _hasVip = values[0] == true;
+        _profileName = profile?['display_name']?.toString();
+        _vipLoading = false;
+      });
     } catch (_) {
       final email = Supabase.instance.client.auth.currentUser?.email?.toLowerCase();
       if (mounted) setState(() {
@@ -454,7 +465,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
-    final name = user?.userMetadata?['display_name'] ?? 'Member';
+    final name = _profileName ?? user?.userMetadata?['display_name'] ?? 'Member';
     final hideAds = _hasVip || user?.email?.toLowerCase() == 'roopanaaz2@gmail.com';
 
     return Scaffold(
