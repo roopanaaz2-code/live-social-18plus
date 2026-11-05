@@ -241,7 +241,10 @@ class _NightLinkFeedScreenState extends State<NightLinkFeedScreen> {
             children: [
               const Padding(
                 padding: EdgeInsets.all(16),
-                child: Text('ADD MUSIC', style: TextStyle(color: _gold, fontWeight: FontWeight.bold)),
+                child: Text(
+                  'ADD MUSIC • Use audio you own or are licensed to use.',
+                  style: TextStyle(color: _gold, fontWeight: FontWeight.bold),
+                ),
               ),
               ListTile(
                 leading: const Icon(Icons.volume_off, color: _blue),
