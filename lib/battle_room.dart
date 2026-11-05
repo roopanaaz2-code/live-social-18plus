@@ -411,12 +411,20 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
   Widget _playerTile(Map<String, dynamic> player) {
     final userId = player['user_id'].toString();
     final isMe = userId == _myId;
-    final participant = isMe
-        ? _room?.localParticipant
-        : _room?.remoteParticipants[userId];
     VideoTrack? videoTrack;
-    if (participant != null) {
-      for (final publication in participant.videoTrackPublications) {
+    if (isMe) {
+      final publications = _room?.localParticipant?.videoTrackPublications ?? [];
+      for (final publication in publications) {
+        final track = publication.track;
+        if (track is VideoTrack && !publication.muted) {
+          videoTrack = track;
+          break;
+        }
+      }
+    } else {
+      final remoteParticipant = _room?.remoteParticipants[userId];
+      final publications = remoteParticipant?.videoTrackPublications ?? [];
+      for (final publication in publications) {
         final track = publication.track;
         if (track is VideoTrack && !publication.muted) {
           videoTrack = track;
