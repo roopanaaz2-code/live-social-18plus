@@ -51,6 +51,8 @@ jobs:
           test -f "$BUILD_DIR/android/gradle/wrapper/gradle-wrapper.jar"
           chmod +x "$BUILD_DIR/android/gradlew"
           cp -R lib/. "$BUILD_DIR/lib/"
+          # flutter create generates a sample test that references MyApp; NightLink has its own app entry point.
+          rm -rf "$BUILD_DIR/test"
 
           ADMOB_ANDROID_APP_ID="${{ secrets.ADMOB_ANDROID_APP_ID }}" python3 - "$BUILD_DIR/android/app/src/main/AndroidManifest.xml" <<'PY'
           import os
