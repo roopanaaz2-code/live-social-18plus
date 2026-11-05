@@ -170,6 +170,8 @@ class IncomingCallOverlay extends StatefulWidget {
 class _IncomingCallOverlayState extends State<IncomingCallOverlay> {
   final _client = Supabase.instance.client;
   RealtimeChannel? _channel;
+  StreamSubscription<AuthState>? _authSubscription;
+  String? _subscribedUserId;
   Map<String, dynamic>? _invite;
   String _callerName = 'NightLink member';
   bool _busy = false;
@@ -177,24 +179,38 @@ class _IncomingCallOverlayState extends State<IncomingCallOverlay> {
   @override
   void initState() {
     super.initState();
-    _loadPending();
+    _authSubscription = _client.auth.onAuthStateChange.listen((_) {
+      _configureForCurrentUser();
+    });
+    _configureForCurrentUser();
+  }
+
+  void _configureForCurrentUser() {
     final userId = _client.auth.currentUser?.id;
-    if (userId != null) {
-      _channel = _client
-          .channel('global-incoming-calls-$userId')
-          .onPostgresChanges(
-            event: PostgresChangeEvent.insert,
-            schema: 'public',
-            table: 'call_invitations',
-            filter: PostgresChangeFilter(
-              type: PostgresChangeFilterType.eq,
-              column: 'receiver_id',
-              value: userId,
-            ),
-            callback: (_) => _loadPending(),
-          )
-          .subscribe();
+    if (userId == _subscribedUserId) return;
+    final previous = _channel;
+    _channel = null;
+    _subscribedUserId = userId;
+    if (previous != null) _client.removeChannel(previous);
+    if (userId == null) {
+      if (mounted) setState(() => _invite = null);
+      return;
     }
+    _loadPending();
+    _channel = _client
+        .channel('global-incoming-calls-$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'call_invitations',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'receiver_id',
+            value: userId,
+          ),
+          callback: (_) => _loadPending(),
+        )
+        .subscribe();
   }
 
   Future<void> _loadPending() async {
@@ -271,6 +287,7 @@ class _IncomingCallOverlayState extends State<IncomingCallOverlay> {
   void dispose() {
     final channel = _channel;
     if (channel != null) _client.removeChannel(channel);
+    _authSubscription?.cancel();
     super.dispose();
   }
 
