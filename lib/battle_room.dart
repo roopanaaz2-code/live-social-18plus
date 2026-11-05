@@ -288,6 +288,9 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
     }
   }
 
+  bool get _isDeveloper =>
+      _db.auth.currentUser?.email?.toLowerCase() == 'roopanaaz2@gmail.com';
+
   Future<void> _showGiftPicker() async {
     if (_players.isEmpty) return;
     final balanceRow = await _db.from('coin_wallets')
@@ -308,7 +311,7 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
               Row(
                 children: [
                   const Expanded(child: Text('SEND A BATTLE GIFT', style: TextStyle(color: _gold, fontWeight: FontWeight.bold))),
-                  Text('$balance coins', style: const TextStyle(color: _blue)),
+                  Text(_isDeveloper ? 'DEVELOPER VIP • GIFTS FREE' : '$balance coins', style: const TextStyle(color: _blue, fontSize: 11)),
                 ],
               ),
               const SizedBox(height: 12),
@@ -339,7 +342,7 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
                     final cost = (gift['coin_cost'] as num).toInt();
                     return InkWell(
                       borderRadius: BorderRadius.circular(12),
-                      onTap: (!free && balance < cost) ? null : () async {
+                      onTap: (!free && !_isDeveloper && balance < cost) ? null : () async {
                         Navigator.pop(sheetContext);
                         await _sendGift(gift);
                       },
@@ -356,8 +359,8 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
                             const SizedBox(height: 4),
                             Text(gift['display_name'].toString(), maxLines: 1, overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontSize: 11, color: Colors.white)),
-                            Text(free ? 'FREE' : '$cost coins',
-                              style: TextStyle(fontSize: 10, color: (!free && balance < cost) ? Colors.redAccent : _gold)),
+                            Text((free || _isDeveloper) ? 'FREE' : '$cost coins',
+                              style: TextStyle(fontSize: 10, color: (!free && !_isDeveloper && balance < cost) ? Colors.redAccent : _gold)),
                           ],
                         ),
                       ),
