@@ -166,14 +166,55 @@ jobs:
             --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY" \
             --dart-define=NIGHTLINK_SUPPORT_EMAIL="$NIGHTLINK_SUPPORT_EMAIL"
 
+      - name: Start Android 15 emulator
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          sdkmanager --install "system-images;android-35;google_apis;x86_64" "platform-tools" "emulator"
+          echo "no" | avdmanager create avd --force --name nightlink_api35 --package "system-images;android-35;google_apis;x86_64" --device "pixel_2"
+          "${ANDROID_HOME}/emulator/emulator" \
+            -avd nightlink_api35 \
+            -no-window \
+            -no-audio \
+            -no-boot-anim \
+            -no-snapshot \
+            -gpu swiftshader_indirect \
+            -camera-back none \
+            > "${RUNNER_TEMP}/nightlink-emulator.log" 2>&1 &
+          echo $! > "${RUNNER_TEMP}/nightlink-emulator.pid"
+          adb start-server
+          adb wait-for-device
+          for attempt in $(seq 1 120); do
+            booted="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r' || true)"
+            if [ "$booted" = "1" ]; then
+              echo "Android 15 emulator boot completed."
+              break
+            fi
+            if [ "$attempt" -eq 120 ]; then
+              echo "::error::Android emulator did not finish booting within 10 minutes."
+              tail -200 "${RUNNER_TEMP}/nightlink-emulator.log" || true
+              exit 1
+            fi
+            sleep 5
+          done
+          adb shell input keyevent 82 || true
+
       - name: Install and launch APK on Android 15 emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          arch: x86_64
-          profile: pixel_2
-          disable-animations: true
-          script: bash .github/scripts/android-smoke-test.sh "${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk"
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          bash .github/scripts/android-smoke-test.sh "${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk"
+
+      - name: Stop Android emulator
+        if: always()
+        shell: bash
+        run: |
+          adb emu kill || true
+          if [ -f "${RUNNER_TEMP}/nightlink-emulator.pid" ]; then
+            kill "$(cat "${RUNNER_TEMP}/nightlink-emulator.pid")" 2>/dev/null || true
+          fi
       - name: Verify APK
         shell: bash
         run: |
