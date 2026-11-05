@@ -58,7 +58,7 @@ jobs:
       - name: Install Supabase dependency
         working-directory: ${{ runner.temp }}/nightlink
         run: |
-          flutter pub add supabase_flutter livekit_client:^2.13.2
+          flutter pub add supabase_flutter livekit_client:^2.13.2 url_launcher
           flutter pub get
 
       - name: Build Android APK
