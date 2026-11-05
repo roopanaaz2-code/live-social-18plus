@@ -65,13 +65,15 @@ jobs:
           # Force every Android plugin's Java and Kotlin tasks to the same target.
           cat >> "$RUNNER_TEMP/nightlink/android/build.gradle.kts" <<'KOTLIN'
 
-          subprojects {
-              // Android plugins can reset Java compatibility while applying their
-              // own Gradle configuration. Apply the final targets after evaluation.
-              afterEvaluate {
+          // Apply the final compiler targets only after all Android projects
+          // and plugins have completed configuration. Do not call afterEvaluate
+          // on individual projects: Flutter may already have evaluated them.
+          gradle.projectsEvaluated {
+              allprojects {
                   tasks.withType<JavaCompile>().configureEach {
                       sourceCompatibility = JavaVersion.VERSION_17.toString()
                       targetCompatibility = JavaVersion.VERSION_17.toString()
+                      options.release.set(17)
                   }
                   tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
                       compilerOptions {
