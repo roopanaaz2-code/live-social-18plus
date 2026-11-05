@@ -19,6 +19,8 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
   final _client = Supabase.instance.client;
   int _balance = 0;
   List<Map<String, dynamic>> _packages = [];
+  bool get _isDeveloper =>
+      _client.auth.currentUser?.email?.toLowerCase() == 'roopanaaz2@gmail.com';
   bool _loading = true;
   String? _error;
 
@@ -96,8 +98,8 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
                         const SizedBox(height: 8),
                         const Text('YOUR COIN BALANCE', style: TextStyle(color: Colors.white70, letterSpacing: 1.4)),
                         const SizedBox(height: 5),
-                        Text('$_balance', style: const TextStyle(color: _gold, fontSize: 38, fontWeight: FontWeight.bold)),
-                        const Text('NIGHTLINK COINS', style: TextStyle(color: _blue, fontSize: 11, letterSpacing: 2)),
+                        Text(_isDeveloper ? 'UNLIMITED' : '$_balance', style: const TextStyle(color: _gold, fontSize: 34, fontWeight: FontWeight.bold)),
+                        Text(_isDeveloper ? 'DEVELOPER VIP' : 'NIGHTLINK COINS', style: const TextStyle(color: _blue, fontSize: 11, letterSpacing: 2)),
                       ],
                     ),
                   ),
@@ -110,15 +112,26 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
                     ),
                   ],
                   const SizedBox(height: 24),
-                  const Text('BUY COINS', style: TextStyle(color: _gold, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                  const SizedBox(height: 10),
-                  ..._packages.map(_packageCard),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Coin purchases are temporarily paused. You can choose from the full gift catalog inside a live battle.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white54, fontSize: 11, height: 1.5),
-                  ),
+                  if (_isDeveloper)
+                    const Card(
+                      color: Color(0xFF17233D),
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text('Developer VIP is active. All battle gifts are free for this account; no coin purchase is needed.',
+                          textAlign: TextAlign.center, style: TextStyle(color: _gold, height: 1.5)),
+                      ),
+                    )
+                  else ...[
+                    const Text('BUY COINS', style: TextStyle(color: _gold, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                    const SizedBox(height: 10),
+                    ..._packages.map(_packageCard),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Coin purchases are paused until a verified payment provider is connected.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white54, fontSize: 11, height: 1.5),
+                    ),
+                  ],
                   if (_client.auth.currentUser?.email?.toLowerCase() == 'roopanaaz2@gmail.com') ...[
                     const SizedBox(height: 22),
                     Card(
