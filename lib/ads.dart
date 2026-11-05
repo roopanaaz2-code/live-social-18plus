@@ -4,6 +4,12 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 const admobAndroidAppId = String.fromEnvironment('ADMOB_ANDROID_APP_ID');
 const admobBannerAdUnitId = String.fromEnvironment('ADMOB_BANNER_AD_UNIT_ID');
 
+Future<void> initializeNightLinkAds() async {
+  if (admobAndroidAppId.isNotEmpty && admobBannerAdUnitId.isNotEmpty) {
+    await MobileAds.instance.initialize();
+  }
+}
+
 class NightLinkBannerAd extends StatefulWidget {
   const NightLinkBannerAd({super.key, required this.hide});
   final bool hide;
