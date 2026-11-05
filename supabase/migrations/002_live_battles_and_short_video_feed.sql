@@ -400,3 +400,64 @@ end;
 $$;
 revoke all on function public.add_battle_like(uuid,uuid) from public,anon;
 grant execute on function public.add_battle_like(uuid,uuid) to authenticated;
+
+
+-- A tied top score is a draw rather than an arbitrary team-number win.
+create or replace function public.finish_battle(p_match_id uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_match public.matches%rowtype;
+  v_winner integer;
+  v_scores jsonb;
+begin
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
+  select * into v_match from public.matches where id=p_match_id for update;
+  if not found then raise exception 'Battle not found'; end if;
+  if v_match.status='completed' then
+    select coalesce(jsonb_agg(jsonb_build_object('team_no',team_no,'score',score)),'[]'::jsonb)
+      into v_scores from public.battle_scores where match_id=p_match_id;
+    return jsonb_build_object('status','completed','winner_team_no',v_match.winner_team_no,
+      'is_draw',v_match.winner_team_no is null,'scores',v_scores);
+  end if;
+  if v_match.status<>'live' then raise exception 'Battle is not live'; end if;
+  if v_match.battle_ends_at is not null and now()<v_match.battle_ends_at then
+    raise exception 'Battle timer has not finished';
+  end if;
+  select case when count(*)=1 then max(team_no) else null end into v_winner
+  from public.battle_scores where match_id=p_match_id
+    and score=(select max(score) from public.battle_scores where match_id=p_match_id);
+  update public.matches set status='completed',ended_at=now(),winner_team_no=v_winner where id=p_match_id;
+  select coalesce(jsonb_agg(jsonb_build_object('team_no',team_no,'score',score)),'[]'::jsonb)
+    into v_scores from public.battle_scores where match_id=p_match_id;
+  return jsonb_build_object('status','completed','winner_team_no',v_winner,
+    'is_draw',v_winner is null,'scores',v_scores);
+end;
+$$;
+
+create or replace function public.get_live_battles()
+returns table(match_id uuid,mode text,started_at timestamptz,battle_ends_at timestamptz,players jsonb,scores jsonb)
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
+  update public.matches m set status='completed',ended_at=coalesce(m.ended_at,now()),
+    winner_team_no=(
+      select case when count(*)=1 then max(team_no) else null end
+      from public.battle_scores bs where bs.match_id=m.id
+        and bs.score=(select max(bs2.score) from public.battle_scores bs2 where bs2.match_id=m.id)
+    )
+  where m.status='live' and m.battle_ends_at is not null and m.battle_ends_at<=now();
+  return query select m.id,m.mode,m.started_at,m.battle_ends_at,
+    coalesce((select jsonb_agg(jsonb_build_object('user_id',mp.user_id,'team_no',mp.team_no,
+      'display_name',coalesce(nullif(p.display_name,''),'Member'),'avatar_url',p.avatar_url)
+      order by mp.team_no,mp.slot_no)
+      from public.match_players mp left join public.profiles p on p.id=mp.user_id
+      where mp.match_id=m.id and mp.state in ('joined','ready')),'[]'::jsonb),
+    coalesce((select jsonb_agg(jsonb_build_object('team_no',bs.team_no,'score',bs.score) order by bs.team_no)
+      from public.battle_scores bs where bs.match_id=m.id),'[]'::jsonb)
+  from public.matches m where m.status='live' order by m.started_at desc;
+end;
+$$;
+revoke all on function public.finish_battle(uuid) from public,anon;
+grant execute on function public.finish_battle(uuid) to authenticated;
+revoke all on function public.get_live_battles() from public,anon;
+grant execute on function public.get_live_battles() to authenticated;
