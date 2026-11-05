@@ -184,21 +184,46 @@ jobs:
             > "${RUNNER_TEMP}/nightlink-emulator.log" 2>&1 &
           echo $! > "${RUNNER_TEMP}/nightlink-emulator.pid"
           adb start-server
-          adb wait-for-device
-          for attempt in $(seq 1 120); do
-            booted="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
-            if [ "$booted" = "1" ]; then
-              echo "Android 15 emulator boot completed."
-              break
+          DEVICE_SERIAL="emulator-5554"
+          EMULATOR_READY=false
+          for attempt in $(seq 1 180); do
+            device_state="$(adb devices 2>/dev/null | awk -v serial="$DEVICE_SERIAL" '$1 == serial {print $2}' || true)"
+            if [ "$device_state" = "offline" ]; then
+              adb reconnect offline >/dev/null 2>&1 || true
+            elif [ "$device_state" = "device" ]; then
+              booted="$(adb -s "$DEVICE_SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+              input_service="$(adb -s "$DEVICE_SERIAL" shell service check input 2>/dev/null || true)"
+              package_service="$(adb -s "$DEVICE_SERIAL" shell service check package 2>/dev/null || true)"
+              if [ "$booted" = "1" ] && echo "$input_service" | grep -q "found" && echo "$package_service" | grep -q "found"; then
+                EMULATOR_READY=true
+                echo "Android 15 emulator is online; boot, input, and package services are ready."
+                break
+              fi
             fi
-            if [ "$attempt" -eq 120 ]; then
-              echo "::error::Android emulator did not finish booting within 10 minutes."
-              tail -200 "${RUNNER_TEMP}/nightlink-emulator.log" || true
+
+            if [ "$attempt" -eq 60 ] || [ "$attempt" -eq 120 ]; then
+              echo "ADB has not become fully ready after $((attempt * 5)) seconds; restarting the ADB server."
+              adb kill-server >/dev/null 2>&1 || true
+              adb start-server
+              adb reconnect offline >/dev/null 2>&1 || true
+            fi
+
+            if [ "$attempt" -eq 180 ]; then
+              echo "::error::Android 15 emulator did not become fully ready within 15 minutes."
+              echo "ADB device state:"
+              adb devices -l || true
+              echo "Emulator log:"
+              tail -250 "${RUNNER_TEMP}/nightlink-emulator.log" || true
               exit 1
             fi
             sleep 5
           done
-          adb shell input keyevent 82 || true
+
+          if [ "$EMULATOR_READY" != "true" ]; then
+            echo "::error::Android emulator readiness check did not pass."
+            exit 1
+          fi
+          adb -s "$DEVICE_SERIAL" shell input keyevent 82 || true
 
       - name: Install and launch APK on Android 15 emulator
         shell: bash
