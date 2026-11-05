@@ -36,7 +36,7 @@ for attempt in $(seq 1 60); do
   fi
   if [ "$attempt" -eq 60 ]; then
     echo "::error::Android emulator was connected but did not finish booting."
-    exit 1
+    false
   fi
   sleep 2
 done
@@ -61,7 +61,7 @@ for attempt in $(seq 1 30); do
 done
 if [ -z "$APP_PID" ]; then
   echo "::error::NightLink did not create an application process after launch."
-  exit 1
+  false
 fi
 
 echo "NightLink started with PID: $APP_PID"
@@ -70,14 +70,14 @@ sleep 30
 APP_PID_AFTER="$(adb shell pidof "$PACKAGE_NAME" 2>/dev/null | tr -d '\r' || true)"
 if [ -z "$APP_PID_AFTER" ]; then
   echo "::error::NightLink process exited within 30 seconds of launch."
-  exit 1
+  false
 fi
 
 adb shell dumpsys activity activities > "$ACTIVITY_FILE"
 if ! grep -Fq "$PACKAGE_NAME" "$ACTIVITY_FILE"; then
   echo "::error::NightLink process is alive, but its activity was not found in ActivityManager."
   tail -120 "$ACTIVITY_FILE" || true
-  exit 1
+  false
 fi
 
 adb logcat -d -t 2500 > "$LOG_FILE"
