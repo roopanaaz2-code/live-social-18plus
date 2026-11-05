@@ -410,6 +410,30 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
           },
         )
         .subscribe();
+    _checkCurrentStatus();
+  }
+
+  Future<void> _checkCurrentStatus() async {
+    try {
+      final row = await _client
+          .from('call_invitations')
+          .select('status')
+          .eq('id', widget.invitationId)
+          .maybeSingle();
+      final status = row?['status']?.toString();
+      if (status == 'accepted' && !_opening && mounted) {
+        _opening = true;
+        Navigator.pushReplacement(context, MaterialPageRoute(
+          builder: (_) => LiveCallScreen(
+            mode: widget.mode,
+            otherName: widget.otherName,
+            roomName: widget.roomName,
+          ),
+        ));
+      } else if (status == 'declined' && mounted) {
+        setState(() => _status = '${widget.otherName} declined the call.');
+      }
+    } catch (_) {}
   }
 
   Future<void> _cancel() async {
