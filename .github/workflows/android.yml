@@ -54,6 +54,15 @@ jobs:
                   text = text.replace('<application', permission + '\n    <application', 1)
           manifest.write_text(text)
           PY
+          # Align Kotlin compilation for every Android plugin with Java 11.
+          cat >> "$RUNNER_TEMP/nightlink/android/build.gradle.kts" <<'KOTLIN'
+          
+          subprojects {
+              tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+                  kotlinOptions.jvmTarget = "11"
+              }
+          }
+          KOTLIN
 
       - name: Add NightLink app code
         run: |
