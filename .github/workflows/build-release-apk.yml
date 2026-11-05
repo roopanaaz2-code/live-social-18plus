@@ -34,6 +34,11 @@ jobs:
           flutter-version: '3.47.9'
           cache: true
 
+      # The Flutter action does not install Android SDK command-line tools or ADB.
+      # Install them explicitly before any emulator commands are used.
+      - name: Set up Android SDK tools
+        uses: android-actions/setup-android@v4
+
       - name: Show toolchain versions
         shell: bash
         run: |
@@ -166,6 +171,26 @@ jobs:
             --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY" \
             --dart-define=NIGHTLINK_SUPPORT_EMAIL="$NIGHTLINK_SUPPORT_EMAIL"
 
+      # Keep the successfully built APK available even if the emulator infrastructure fails.
+      - name: Verify release APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk"
+          test -s "$APK" || {
+            echo "Release APK was not generated or is empty." >&2
+            exit 1
+          }
+          ls -lh "$APK"
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NightLink-Android-APK
+          path: ${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Enable KVM permissions for Android emulator
         shell: bash
         run: |
@@ -188,6 +213,14 @@ jobs:
         timeout-minutes: 15
         run: |
           set -euo pipefail
+          echo "Checking Android SDK command-line tools..."
+          command -v sdkmanager
+          command -v avdmanager
+          command -v adb
+          test -x "${ANDROID_HOME}/emulator/emulator" || {
+            echo "::error::Android emulator binary is missing from ANDROID_HOME." >&2
+            exit 1
+          }
           sdkmanager --install "system-images;android-35;google_apis;x86_64" "platform-tools" "emulator"
           echo "no" | avdmanager create avd --force --name nightlink_api35 --package "system-images;android-35;google_apis;x86_64" --device "pixel_2"
           # Start ADB before launching the emulator to avoid the first-boot daemon race.
@@ -258,21 +291,3 @@ jobs:
           if [ -f "${RUNNER_TEMP}/nightlink-emulator.pid" ]; then
             kill "$(cat "${RUNNER_TEMP}/nightlink-emulator.pid")" 2>/dev/null || true
           fi
-      - name: Verify APK
-        shell: bash
-        run: |
-          set -euo pipefail
-          APK="${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk"
-          test -s "$APK" || {
-            echo "Release APK was not generated or is empty." >&2
-            exit 1
-          }
-          ls -lh "$APK"
-
-      - name: Upload release APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: NightLink-Android-APK
-          path: ${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk
-          if-no-files-found: error
-          retention-days: 14
