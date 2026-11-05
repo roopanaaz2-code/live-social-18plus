@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'connections.dart';
+
 const _gold = Color(0xFFFFC857);
 const _blue = Color(0xFF2589FF);
 const _dark = Color(0xFF090D18);
@@ -24,9 +26,19 @@ class _ChatScreenState extends State<ChatScreen> {
     final user = _db.auth.currentUser;
     if (user == null) return;
     try {
-      final rows = await _db.from('profiles')
-          .select('id, username, display_name, avatar_url')
-          .neq('id', user.id).order('display_name');
+      final links = await _db.from('friendships')
+          .select('user_low_id, user_high_id')
+          .or('user_low_id.eq.${user.id},user_high_id.eq.${user.id}');
+      final ids = (links as List).map((row) {
+        final low = row['user_low_id'].toString();
+        final high = row['user_high_id'].toString();
+        return low == user.id ? high : low;
+      }).toList();
+      final rows = ids.isEmpty
+          ? <Map<String, dynamic>>[]
+          : await _db.from('profiles')
+              .select('id, username, display_name, avatar_url')
+              .inFilter('id', ids).order('display_name');
       if (!mounted) return;
       setState(() {
         _people = List<Map<String, dynamic>>.from(rows);
@@ -45,7 +57,17 @@ class _ChatScreenState extends State<ChatScreen> {
     appBar: AppBar(
       backgroundColor: _dark,
       title: const Text('TEXT CHAT', style: TextStyle(color: _gold, fontWeight: FontWeight.bold)),
-      actions: [IconButton(onPressed: _loadPeople, icon: const Icon(Icons.refresh, color: _blue))],
+      actions: [
+        IconButton(
+          tooltip: 'Find members',
+          onPressed: () async {
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => const ConnectionsScreen()));
+            _loadPeople();
+          },
+          icon: const Icon(Icons.person_search, color: _gold),
+        ),
+        IconButton(onPressed: _loadPeople, icon: const Icon(Icons.refresh, color: _blue)),
+      ],
     ),
     body: _loading
       ? const Center(child: CircularProgressIndicator(color: _gold))
@@ -57,7 +79,7 @@ class _ChatScreenState extends State<ChatScreen> {
         : _people.isEmpty
           ? const Center(child: Padding(
               padding: EdgeInsets.all(28),
-              child: Text('No other members are available yet. Invite someone to create a NightLink account, then refresh.',
+              child: Text('No accepted connections yet. Tap the people-search icon above to find members by username and send a connection request.',
                 textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, height: 1.5)),
             ))
           : ListView.separated(
