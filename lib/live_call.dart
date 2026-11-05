@@ -1,0 +1,483 @@
+import 'package:flutter/material.dart';
+import 'package:livekit_client/livekit_client.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+const _gold = Color(0xFFFFC857);
+const _blue = Color(0xFF2589FF);
+const _dark = Color(0xFF090D18);
+
+enum NightLinkCallMode { voice, video }
+
+class CallContactsScreen extends StatefulWidget {
+  const CallContactsScreen({super.key, required this.mode});
+  final NightLinkCallMode mode;
+
+  @override
+  State<CallContactsScreen> createState() => _CallContactsScreenState();
+}
+
+class _CallContactsScreenState extends State<CallContactsScreen> {
+  final _client = Supabase.instance.client;
+  List<Map<String, dynamic>> _people = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPeople();
+  }
+
+  Future<void> _loadPeople() async {
+    final currentUser = _client.auth.currentUser;
+    if (currentUser == null) return;
+    try {
+      final rows = await _client
+          .from('profiles')
+          .select('id, username, display_name')
+          .neq('id', currentUser.id)
+          .order('display_name');
+      if (!mounted) return;
+      setState(() {
+        _people = List<Map<String, dynamic>>.from(rows);
+        _loading = false;
+        _error = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load members. Please try again.';
+      });
+    }
+  }
+
+  String _roomName(String otherId) {
+    final ids = [ _client.auth.currentUser!.id, otherId ]..sort();
+    // UUID prefixes keep the room name within LiveKit's 64-character limit.
+    final first = ids[0].replaceAll('-', '').substring(0, 24);
+    final second = ids[1].replaceAll('-', '').substring(0, 24);
+    final prefix = widget.mode == NightLinkCallMode.voice ? 'voice' : 'video';
+    return '${prefix}_${first}_${second}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isVideo = widget.mode == NightLinkCallMode.video;
+    return Scaffold(
+      backgroundColor: _dark,
+      appBar: AppBar(
+        backgroundColor: _dark,
+        title: Text(isVideo ? 'VIDEO CHAT' : 'VOICE CHAT',
+            style: const TextStyle(color: _gold, fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            onPressed: _loadPeople,
+            icon: const Icon(Icons.refresh, color: _blue),
+          ),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: _gold))
+          : _error != null
+              ? Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text(_error!, style: const TextStyle(color: Colors.white70)),
+                    ElevatedButton(onPressed: _loadPeople, child: const Text('RETRY')),
+                  ]),
+                )
+              : _people.isEmpty
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(26),
+                        child: Text(
+                          'No other members are available yet. Invite someone to create a NightLink account, then refresh.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white70, height: 1.5),
+                        ),
+                      ),
+                    )
+                  : ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        const Text(
+                          'Choose a member to join a private live room.',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'For now, both members should open the same chat type and select each other. Incoming-call alerts are not enabled yet.',
+                          style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.4),
+                        ),
+                        const SizedBox(height: 12),
+                        for (final person in _people)
+                          Card(
+                            color: const Color(0xFF11182B),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: const Color(0x332589FF),
+                                child: Icon(isVideo ? Icons.videocam : Icons.mic, color: _blue),
+                              ),
+                              title: Text(
+                                (person['display_name'] ?? person['username'] ?? 'NightLink member').toString(),
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: const Text('Join private room', style: TextStyle(color: Colors.white54)),
+                              trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: _gold),
+                              onTap: () {
+                                final name = (person['display_name'] ?? person['username'] ?? 'Member').toString();
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => LiveCallScreen(
+                                      mode: widget.mode,
+                                      otherName: name,
+                                      roomName: _roomName(person['id'].toString()),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
+    );
+  }
+}
+
+class LiveCallScreen extends StatefulWidget {
+  const LiveCallScreen({
+    super.key,
+    required this.mode,
+    required this.otherName,
+    required this.roomName,
+  });
+
+  final NightLinkCallMode mode;
+  final String otherName;
+  final String roomName;
+
+  @override
+  State<LiveCallScreen> createState() => _LiveCallScreenState();
+}
+
+class _LiveCallScreenState extends State<LiveCallScreen> {
+  Room? _room;
+  bool _connecting = true;
+  bool _connected = false;
+  bool _micEnabled = true;
+  bool _cameraEnabled = true;
+  String? _error;
+
+  bool get _isVideo => widget.mode == NightLinkCallMode.video;
+
+  @override
+  void initState() {
+    super.initState();
+    _connect();
+  }
+
+  Future<void> _connect() async {
+    try {
+      final response = await Supabase.instance.client.functions.invoke(
+        'generate-livekit-token',
+        body: {'roomName': widget.roomName},
+      );
+
+      final data = response.data;
+      if (response.status < 200 || response.status >= 300 || data is! Map) {
+        final detail = data is Map ? data['error']?.toString() : null;
+        throw Exception(detail ?? 'Could not get a secure call token (HTTP ${response.status}).');
+      }
+
+      final token = data['token']?.toString();
+      final serverUrl = data['serverUrl']?.toString();
+      if (token == null || token.isEmpty || serverUrl == null || serverUrl.isEmpty) {
+        throw Exception('The call server returned incomplete connection details.');
+      }
+
+      final room = Room();
+      _room = room;
+      room.addListener(_onRoomChanged);
+
+      await room.connect(
+        serverUrl,
+        token,
+        roomOptions: const RoomOptions(adaptiveStream: true, dynacast: true),
+      );
+
+      await room.localParticipant?.setMicrophoneEnabled(true);
+      if (_isVideo) {
+        await room.localParticipant?.setCameraEnabled(true);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _connecting = false;
+        _connected = true;
+        _micEnabled = true;
+        _cameraEnabled = _isVideo;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _connecting = false;
+        _connected = false;
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  void _onRoomChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _toggleMic() async {
+    final room = _room;
+    if (room == null) return;
+    final next = !_micEnabled;
+    try {
+      await room.localParticipant?.setMicrophoneEnabled(next);
+      if (mounted) setState(() => _micEnabled = next);
+    } catch (error) {
+      _showError(error);
+    }
+  }
+
+  Future<void> _toggleCamera() async {
+    final room = _room;
+    if (room == null || !_isVideo) return;
+    final next = !_cameraEnabled;
+    try {
+      await room.localParticipant?.setCameraEnabled(next);
+      if (mounted) setState(() => _cameraEnabled = next);
+    } catch (error) {
+      _showError(error);
+    }
+  }
+
+  void _showError(Object error) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Call control failed: $error')),
+    );
+  }
+
+  Future<void> _leave() async {
+    final room = _room;
+    _room = null;
+    if (room != null) {
+      room.removeListener(_onRoomChanged);
+      await room.disconnect();
+      room.dispose();
+    }
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  void dispose() {
+    final room = _room;
+    if (room != null) {
+      room.removeListener(_onRoomChanged);
+      room.disconnect();
+      room.dispose();
+    }
+    super.dispose();
+  }
+
+  Widget _videoTile(dynamic participant, String label) {
+    final publications = participant.videoTrackPublications;
+    for (final publication in publications) {
+      final track = publication.track;
+      if (track != null && !publication.muted) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: VideoTrackRenderer(track as VideoTrack),
+        );
+      }
+    }
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF17233A),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.person, color: _blue, size: 54),
+            const SizedBox(height: 8),
+            Text(label, style: const TextStyle(color: Colors.white70)),
+            const Text('Camera off', style: TextStyle(color: Colors.white38, fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final room = _room;
+    final remoteCount = room?.remoteParticipants.length ?? 0;
+    final local = room?.localParticipant;
+
+    return WillPopScope(
+      onWillPop: () async {
+        await _leave();
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: _dark,
+        appBar: AppBar(
+          backgroundColor: _dark,
+          title: Text(_isVideo ? 'VIDEO CALL' : 'VOICE CALL'),
+          leading: IconButton(onPressed: _leave, icon: const Icon(Icons.close)),
+        ),
+        body: _connecting
+            ? const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: _gold),
+                    SizedBox(height: 18),
+                    Text('Connecting securely to LiveKit...', style: TextStyle(color: Colors.white70)),
+                  ],
+                ),
+              )
+            : _error != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error_outline, color: Colors.orangeAccent, size: 48),
+                          const SizedBox(height: 14),
+                          const Text('Could not start the call', style: TextStyle(color: _gold, fontSize: 18)),
+                          const SizedBox(height: 10),
+                          Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
+                          const SizedBox(height: 18),
+                          ElevatedButton(onPressed: _leave, child: const Text('CLOSE')),
+                        ],
+                      ),
+                    ),
+                  )
+                : Column(
+                    children: [
+                      Expanded(
+                        child: _isVideo
+                            ? ListView(
+                                padding: const EdgeInsets.all(12),
+                                children: [
+                                  if (local != null)
+                                    SizedBox(
+                                      height: 260,
+                                      child: _videoTile(local, 'You'),
+                                    ),
+                                  for (final participant in room!.remoteParticipants.values)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 12),
+                                      child: SizedBox(
+                                        height: 260,
+                                        child: _videoTile(participant, widget.otherName),
+                                      ),
+                                    ),
+                                  if (remoteCount == 0)
+                                    const Padding(
+                                      padding: EdgeInsets.all(18),
+                                      child: Text(
+                                        'You are in the room. Waiting for the other member to join...',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(color: Colors.white70),
+                                      ),
+                                    ),
+                                ],
+                              )
+                            : Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const CircleAvatar(
+                                      radius: 48,
+                                      backgroundColor: Color(0x332589FF),
+                                      child: Icon(Icons.headset_mic, color: _blue, size: 44),
+                                    ),
+                                    const SizedBox(height: 18),
+                                    Text(widget.otherName, style: const TextStyle(color: _gold, fontSize: 22)),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      remoteCount > 0 ? 'Member connected' : 'Waiting for the other member to join...',
+                                      style: const TextStyle(color: Colors.white70),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                      ),
+                      SafeArea(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 22),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _CallControl(
+                                icon: _micEnabled ? Icons.mic : Icons.mic_off,
+                                label: _micEnabled ? 'Mute' : 'Unmute',
+                                onTap: _toggleMic,
+                              ),
+                              if (_isVideo) ...[
+                                const SizedBox(width: 24),
+                                _CallControl(
+                                  icon: _cameraEnabled ? Icons.videocam : Icons.videocam_off,
+                                  label: _cameraEnabled ? 'Camera off' : 'Camera on',
+                                  onTap: _toggleCamera,
+                                ),
+                              ],
+                              const SizedBox(width: 24),
+                              _CallControl(
+                                icon: Icons.call_end,
+                                label: 'End',
+                                color: Colors.redAccent,
+                                onTap: _leave,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+      ),
+    );
+  }
+}
+
+class _CallControl extends StatelessWidget {
+  const _CallControl({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color = _blue,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: color.withOpacity(.18),
+            child: IconButton(
+              onPressed: onTap,
+              icon: Icon(icon, color: color),
+              iconSize: 25,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+        ],
+      );
+}
