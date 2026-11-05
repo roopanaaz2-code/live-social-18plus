@@ -161,7 +161,6 @@ class _CallContactsScreenState extends State<CallContactsScreen> {
                                       invitationId: invitation['id'].toString(),
                                       mode: widget.mode,
                                       otherName: name,
-                                      roomName: _roomName(person['id'].toString()),
                                     ),
                                   ));
                                 } catch (error) {
@@ -286,9 +285,9 @@ class _IncomingCallOverlayState extends State<IncomingCallOverlay> {
             : NightLinkCallMode.voice;
         await nightLinkNavigatorKey.currentState?.push(MaterialPageRoute(
           builder: (_) => LiveCallScreen(
+            invitationId: invite['id'].toString(),
             mode: mode,
             otherName: _callerName,
-            roomName: invite['room_name'].toString(),
           ),
         ));
       }
@@ -373,13 +372,11 @@ class OutgoingCallScreen extends StatefulWidget {
     required this.invitationId,
     required this.mode,
     required this.otherName,
-    required this.roomName,
   });
 
   final String invitationId;
   final NightLinkCallMode mode;
   final String otherName;
-  final String roomName;
 
   @override
   State<OutgoingCallScreen> createState() => _OutgoingCallScreenState();
@@ -416,9 +413,9 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
               if (mounted) {
                 Navigator.pushReplacement(context, MaterialPageRoute(
                   builder: (_) => LiveCallScreen(
+                    invitationId: widget.invitationId,
                     mode: widget.mode,
                     otherName: widget.otherName,
-                    roomName: widget.roomName,
                   ),
                 ));
               }
@@ -445,9 +442,9 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
         _opening = true;
         Navigator.pushReplacement(context, MaterialPageRoute(
           builder: (_) => LiveCallScreen(
+            invitationId: widget.invitationId,
             mode: widget.mode,
             otherName: widget.otherName,
-            roomName: widget.roomName,
           ),
         ));
       } else if (status == 'declined' && mounted) {
@@ -514,14 +511,14 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
 class LiveCallScreen extends StatefulWidget {
   const LiveCallScreen({
     super.key,
+    required this.invitationId,
     required this.mode,
     required this.otherName,
-    required this.roomName,
   });
 
+  final String invitationId;
   final NightLinkCallMode mode;
   final String otherName;
-  final String roomName;
 
   @override
   State<LiveCallScreen> createState() => _LiveCallScreenState();
@@ -547,7 +544,7 @@ class _LiveCallScreenState extends State<LiveCallScreen> {
     try {
       final response = await Supabase.instance.client.functions.invoke(
         'generate-livekit-token',
-        body: {'roomName': widget.roomName},
+        body: {'invitationId': widget.invitationId},
       );
 
       final data = response.data;
