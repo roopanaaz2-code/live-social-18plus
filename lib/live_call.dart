@@ -108,7 +108,7 @@ class _CallContactsScreenState extends State<CallContactsScreen> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'For now, both members should open the same chat type and select each other. Incoming-call alerts are not enabled yet.',
+                          'Tap CALL to send an invitation. The other member will see Accept or Decline inside NightLink.',
                           style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.4),
                         ),
                         const SizedBox(height: 12),
@@ -124,20 +124,32 @@ class _CallContactsScreenState extends State<CallContactsScreen> {
                                 (person['display_name'] ?? person['username'] ?? 'NightLink member').toString(),
                                 style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
-                              subtitle: const Text('Join private room', style: TextStyle(color: Colors.white54)),
-                              trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: _gold),
-                              onTap: () {
+                              subtitle: const Text('Send a live call invitation', style: TextStyle(color: Colors.white54)),
+                              trailing: const Icon(Icons.call, size: 22, color: _gold),
+                              onTap: () async {
                                 final name = (person['display_name'] ?? person['username'] ?? 'Member').toString();
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => LiveCallScreen(
+                                try {
+                                  final invitation = await _client.from('call_invitations').insert({
+                                    'caller_id': _client.auth.currentUser!.id,
+                                    'receiver_id': person['id'].toString(),
+                                    'call_mode': widget.mode == NightLinkCallMode.voice ? 'voice' : 'video',
+                                    'room_name': _roomName(person['id'].toString()),
+                                  }).select('id').single();
+                                  if (!mounted) return;
+                                  Navigator.push(context, MaterialPageRoute(
+                                    builder: (_) => OutgoingCallScreen(
+                                      invitationId: invitation['id'].toString(),
                                       mode: widget.mode,
                                       otherName: name,
                                       roomName: _roomName(person['id'].toString()),
                                     ),
-                                  ),
-                                );
+                                  ));
+                                } catch (error) {
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Could not send invitation: $error')),
+                                  );
+                                }
                               },
                             ),
                           ),
@@ -145,6 +157,126 @@ class _CallContactsScreenState extends State<CallContactsScreen> {
                     ),
     );
   }
+}
+
+class OutgoingCallScreen extends StatefulWidget {
+  const OutgoingCallScreen({
+    super.key,
+    required this.invitationId,
+    required this.mode,
+    required this.otherName,
+    required this.roomName,
+  });
+
+  final String invitationId;
+  final NightLinkCallMode mode;
+  final String otherName;
+  final String roomName;
+
+  @override
+  State<OutgoingCallScreen> createState() => _OutgoingCallScreenState();
+}
+
+class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
+  final _client = Supabase.instance.client;
+  RealtimeChannel? _channel;
+  String _status = 'Calling... waiting for the member to accept';
+  bool _opening = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _watchInvitation();
+  }
+
+  void _watchInvitation() {
+    _channel = _client
+        .channel('outgoing-call-${widget.invitationId}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'call_invitations',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: widget.invitationId,
+          ),
+          callback: (payload) {
+            final status = payload.newRecord['status']?.toString();
+            if (status == 'accepted' && !_opening) {
+              _opening = true;
+              if (mounted) {
+                Navigator.pushReplacement(context, MaterialPageRoute(
+                  builder: (_) => LiveCallScreen(
+                    mode: widget.mode,
+                    otherName: widget.otherName,
+                    roomName: widget.roomName,
+                  ),
+                ));
+              }
+            } else if (status == 'declined' && mounted) {
+              setState(() => _status = '${widget.otherName} declined the call.');
+            } else if (status == 'cancelled' && mounted) {
+              setState(() => _status = 'Call invitation was cancelled.');
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  Future<void> _cancel() async {
+    try {
+      await _client.from('call_invitations')
+          .update({'status': 'cancelled'})
+          .eq('id', widget.invitationId)
+          .eq('status', 'pending');
+    } catch (_) {}
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  void dispose() {
+    final channel = _channel;
+    if (channel != null) {
+      _client.removeChannel(channel);
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: _dark,
+    appBar: AppBar(
+      backgroundColor: _dark,
+      title: Text(widget.mode == NightLinkCallMode.video ? 'VIDEO INVITATION' : 'VOICE INVITATION'),
+      leading: IconButton(onPressed: _cancel, icon: const Icon(Icons.close)),
+    ),
+    body: Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(widget.mode == NightLinkCallMode.video ? Icons.videocam : Icons.call,
+                color: _gold, size: 68),
+            const SizedBox(height: 20),
+            Text('Calling ${widget.otherName}',
+                style: const TextStyle(color: _gold, fontSize: 23, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Text(_status, textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70)),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _cancel,
+              icon: const Icon(Icons.call_end),
+              label: const Text('CANCEL INVITATION'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class LiveCallScreen extends StatefulWidget {
