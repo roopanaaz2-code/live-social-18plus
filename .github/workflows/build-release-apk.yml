@@ -217,11 +217,16 @@ jobs:
           command -v sdkmanager
           command -v avdmanager
           command -v adb
+          # Install the emulator package before checking for its executable.
+          sdkmanager --install "system-images;android-35;google_apis;x86_64" "platform-tools" "emulator"
           test -x "${ANDROID_HOME}/emulator/emulator" || {
-            echo "::error::Android emulator binary is missing from ANDROID_HOME." >&2
+            echo "::error::Android emulator package installation completed, but the emulator binary is still missing from ANDROID_HOME." >&2
+            echo "ANDROID_HOME=${ANDROID_HOME}" >&2
+            find "${ANDROID_HOME}" -maxdepth 3 -type f -name emulator -print >&2 || true
             exit 1
           }
-          sdkmanager --install "system-images;android-35;google_apis;x86_64" "platform-tools" "emulator"
+          echo "Android emulator binary is installed:"
+          "${ANDROID_HOME}/emulator/emulator" -version
           echo "no" | avdmanager create avd --force --name nightlink_api35 --package "system-images;android-35;google_apis;x86_64" --device "pixel_2"
           # Start ADB before launching the emulator to avoid the first-boot daemon race.
           adb start-server
