@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import 'owner_payments.dart';
 
 const _gold = Color(0xFFFFC857);
 const _blue = Color(0xFF2589FF);
@@ -20,7 +21,6 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
   List<Map<String, dynamic>> _packages = [];
   List<Map<String, dynamic>> _gifts = [];
   bool _loading = true;
-  String? _buyingCode;
   String? _error;
 
   @override
@@ -59,36 +59,6 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
     } catch (error) {
       if (!mounted) return;
       setState(() { _loading = false; _error = 'Could not load your wallet. Please try again.'; });
-    }
-  }
-
-  Future<void> _buy(Map<String, dynamic> pack) async {
-    final code = pack['package_code'].toString();
-    if (_buyingCode != null) return;
-    setState(() { _buyingCode = code; _error = null; });
-    try {
-      final response = await _client.functions.invoke(
-        'tap-create-charge',
-        body: {'packageCode': code},
-      );
-      final data = Map<String, dynamic>.from(response.data as Map);
-      final checkout = Uri.tryParse(data['checkoutUrl']?.toString() ?? '');
-      if (checkout == null || !checkout.hasScheme) {
-        throw Exception('Tap did not return a valid checkout page.');
-      }
-      final opened = await launchUrl(checkout, mode: LaunchMode.externalApplication);
-      if (!opened) throw Exception('Could not open Tap checkout on this device.');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tap checkout opened. Return here after payment and refresh your wallet.')),
-        );
-      }
-    } on FunctionException catch (error) {
-      if (mounted) setState(() => _error = error.details?.toString() ?? error.reasonPhrase ?? 'Payment could not be started.');
-    } catch (error) {
-      if (mounted) setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      if (mounted) setState(() => _buyingCode = null);
     }
   }
 
@@ -147,13 +117,32 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
                   const Text('BUY COINS', style: TextStyle(color: _gold, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                   const SizedBox(height: 10),
                   ..._packages.map(_packageCard),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Coin purchases are temporarily paused. Your wallet and gift catalog are ready; a payment provider will be connected later.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white54, fontSize: 11, height: 1.5),
+                  ),
+                  if (_client.auth.currentUser?.email?.toLowerCase() == 'roopanaaz2@gmail.com') ...[
+                    const SizedBox(height: 22),
+                    Card(
+                      color: const Color(0xFF17233D),
+                      child: ListTile(
+                        leading: const Icon(Icons.admin_panel_settings, color: _gold),
+                        title: const Text('OWNER PAYMENT DASHBOARD', style: TextStyle(color: _gold, fontWeight: FontWeight.bold)),
+                        subtitle: const Text('Private payment records visible only to the owner account', style: TextStyle(color: Colors.white60)),
+                        trailing: const Icon(Icons.chevron_right, color: _blue),
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OwnerPaymentsScreen())),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   const Text('GIFT CATALOG', style: TextStyle(color: _gold, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                   const SizedBox(height: 10),
                   ..._gifts.map(_giftCard),
                   const SizedBox(height: 16),
                   const Text(
-                    'Payments are processed by Tap. Coins are added only after NightLink verifies Tap’s payment confirmation. Free hearts are limited to one per minute per battle.',
+                    'Payment receiving is not connected yet. Free hearts are limited to one per minute per battle.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.white54, fontSize: 11, height: 1.5),
                   ),
@@ -164,7 +153,6 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
   }
 
   Widget _packageCard(Map<String, dynamic> pack) {
-    final code = pack['package_code'].toString();
     final amount = (pack['amount'] as num).toDouble();
     final coins = (pack['coins'] as num).toInt();
     final currency = pack['currency'].toString().toUpperCase();
@@ -174,13 +162,7 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
         leading: const CircleAvatar(backgroundColor: Color(0x223FC3FF), child: Icon(Icons.monetization_on, color: _gold)),
         title: Text('$coins Coins', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         subtitle: Text('${amount.toStringAsFixed(2)} $currency', style: const TextStyle(color: Colors.white60)),
-        trailing: ElevatedButton(
-          onPressed: _buyingCode == null ? () => _buy(pack) : null,
-          style: ElevatedButton.styleFrom(backgroundColor: _gold, foregroundColor: _dark),
-          child: _buyingCode == code
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('BUY'),
-        ),
+        trailing: const Text('SOON', style: TextStyle(color: _gold, fontWeight: FontWeight.bold)),
       ),
     );
   }
