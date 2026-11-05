@@ -87,6 +87,14 @@ jobs:
           }
           KOTLIN
 
+          # Flutter plugins in this app still use the legacy Android DSL and KGP.
+          # AGP 9 enables both new DSL and built-in Kotlin by default; opt out
+          # until those third-party plugins are migrated.
+          cat >> "$BUILD_DIR/android/gradle.properties" <<'PROPS'
+          android.newDsl=false
+          android.builtInKotlin=false
+          PROPS
+
           chmod +x "$BUILD_DIR/android/gradlew"
 
       - name: Resolve Flutter dependencies
