@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'matchmaking.dart';
 import 'chat.dart';
 import 'live_call.dart';
+import 'wallet.dart';
 
 const supabaseUrl = String.fromEnvironment(
   'SUPABASE_URL',
@@ -457,6 +458,14 @@ class HomeScreen extends StatelessWidget {
             subtitle: 'Meet face-to-face in live rooms',
             color: gold,
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CallContactsScreen(mode: NightLinkCallMode.video))),
+          ),
+          const SizedBox(height: 12),
+          _HomeActionCard(
+            icon: Icons.monetization_on_outlined,
+            title: 'COINS & GIFTS',
+            subtitle: 'Buy coins and view the gift catalog',
+            color: gold,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CoinWalletScreen())),
           ),
           const SizedBox(height: 12),
           _HomeActionCard(
