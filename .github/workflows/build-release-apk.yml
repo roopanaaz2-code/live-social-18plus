@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: nightlink-android-apk-\${{ github.ref }}
+  group: nightlink-android-apk-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -86,7 +86,7 @@ jobs:
           grep '^distributionUrl=' "$BUILD_DIR/android/gradle/wrapper/gradle-wrapper.properties"
 
       - name: Resolve Flutter dependencies
-        working-directory: \${{ runner.temp }}/nightlink
+        working-directory: ${{ runner.temp }}/nightlink
         shell: bash
         run: |
           set -euo pipefail
@@ -96,7 +96,7 @@ jobs:
       - name: Check Supabase configuration
         shell: bash
         env:
-          SUPABASE_PUBLISHABLE_KEY: \${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
         run: |
           set -euo pipefail
           test -n "$SUPABASE_PUBLISHABLE_KEY" || {
@@ -105,11 +105,11 @@ jobs:
           }
 
       - name: Build release APK
-        working-directory: \${{ runner.temp }}/nightlink
+        working-directory: ${{ runner.temp }}/nightlink
         shell: bash
         env:
-          SUPABASE_URL: \${{ secrets.SUPABASE_URL || 'https://falimxmpicqaakjnigkv.supabase.co' }}
-          SUPABASE_PUBLISHABLE_KEY: \${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://falimxmpicqaakjnigkv.supabase.co' }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
         run: |
           set -euo pipefail
           flutter build apk --release -v \
@@ -131,6 +131,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: NightLink-Android-APK
-          path: \${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk
+          path: ${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
