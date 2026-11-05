@@ -214,12 +214,24 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends libpulse0
-          echo "Checking emulator runtime dependencies..."
-          ldd "${ANDROID_HOME}/emulator/qemu/linux-x86_64/qemu-system-x86_64" | tee "${RUNNER_TEMP}/nightlink-emulator-dependencies.log"
+          echo "Locating installed Android emulator QEMU executables..."
+          find "${ANDROID_HOME}/emulator" -type f -name 'qemu-system-*' -perm /111 -print
+          mapfile -d '' QEMU_BINARIES < <(find "${ANDROID_HOME}/emulator" -type f -name 'qemu-system-*' -perm /111 -print0)
+          if [ "${#QEMU_BINARIES[@]}" -eq 0 ]; then
+            echo "::error::No executable QEMU system binary was found in the installed Android emulator package." >&2
+            find "${ANDROID_HOME}/emulator" -maxdepth 5 -type f -name '*qemu*' -print >&2 || true
+            exit 1
+          fi
+          : > "${RUNNER_TEMP}/nightlink-emulator-dependencies.log"
+          for qemu_binary in "${QEMU_BINARIES[@]}"; do
+            echo "Checking: ${qemu_binary}"
+            ldd "${qemu_binary}" | tee -a "${RUNNER_TEMP}/nightlink-emulator-dependencies.log"
+          done
           if grep -q "not found" "${RUNNER_TEMP}/nightlink-emulator-dependencies.log"; then
             echo "::error::Android emulator still has unresolved Linux shared-library dependencies." >&2
             exit 1
           fi
+          echo "All discovered Android emulator QEMU binaries have their shared libraries resolved."
 
       - name: Start Android 15 emulator
         shell: bash
