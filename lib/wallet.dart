@@ -19,7 +19,6 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
   final _client = Supabase.instance.client;
   int _balance = 0;
   List<Map<String, dynamic>> _packages = [];
-  List<Map<String, dynamic>> _gifts = [];
   bool _loading = true;
   String? _error;
 
@@ -45,15 +44,12 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
             .eq('user_id', user.id).maybeSingle(),
         _client.from('coin_packages').select('package_code, coins, amount, currency')
             .eq('active', true).order('amount'),
-        _client.from('gift_catalog').select('gift_key, display_name, emoji, coin_cost, score_value, is_free')
-            .eq('active', true).order('coin_cost'),
       ]);
       if (!mounted) return;
       final wallet = results[0] as Map<String, dynamic>?;
       setState(() {
         _balance = (wallet?['balance'] as num?)?.toInt() ?? 0;
         _packages = (results[1] as List).cast<Map<String, dynamic>>();
-        _gifts = (results[2] as List).cast<Map<String, dynamic>>();
         _loading = false;
       });
     } catch (error) {
@@ -136,16 +132,6 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
                       ),
                     ),
                   ],
-                  const SizedBox(height: 24),
-                  const Text('GIFT CATALOG', style: TextStyle(color: _gold, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                  const SizedBox(height: 10),
-                  ..._gifts.map(_giftCard),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Payment receiving is not connected yet. Free hearts are limited to one per minute per battle.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white54, fontSize: 11, height: 1.5),
-                  ),
                 ],
               ),
             ),
@@ -167,17 +153,4 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
     );
   }
 
-  Widget _giftCard(Map<String, dynamic> gift) {
-    final free = gift['is_free'] == true;
-    final cost = (gift['coin_cost'] as num).toInt();
-    return Card(
-      color: const Color(0xFF11182B),
-      child: ListTile(
-        leading: Text(gift['emoji'].toString(), style: const TextStyle(fontSize: 28)),
-        title: Text(gift['display_name'].toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        subtitle: Text(free ? 'Free gift • adds battle points' : 'Adds battle points', style: const TextStyle(color: Colors.white54)),
-        trailing: Text(free ? 'FREE' : '$cost coins', style: const TextStyle(color: _gold, fontWeight: FontWeight.bold)),
-      ),
-    );
-  }
 }
