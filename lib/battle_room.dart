@@ -272,11 +272,11 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
       });
       await _refreshData();
       if (!mounted) return;
-      final added = result is Map && result['added'] == true;
+      final added = result is Map && result['profile_like_added'] == true;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(milliseconds: 900),
-          content: Text(added ? '+2 battle points • profile liked' : 'You already liked this host in this battle'),
+          content: Text(added ? '❤️ Profile liked' : 'Profile like was not recorded'),
         ),
       );
     } catch (error) {
