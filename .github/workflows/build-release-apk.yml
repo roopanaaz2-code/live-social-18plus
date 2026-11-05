@@ -87,9 +87,7 @@ jobs:
           }
           KOTLIN
 
-          # Pin a Flutter-plugin-compatible Android toolchain. The Flutter
-          # template currently generates AGP 9 / Gradle 9, while this app's
-          # native plugins still require the AGP 8 legacy Android build APIs.
+          # Pin a Flutter-plugin-compatible Android toolchain.
           python3 - "$BUILD_DIR/android" <<'PY'
           import re
           import sys
@@ -104,134 +102,29 @@ jobs:
               raise SystemExit("Generated Android settings.gradle file was not found.")
 
           text = settings.read_text()
-          text, agp_count = re.subn(
-              r'(id\\(["\\']com\\.android\\.application["\\']\\)\\s+version\\s+["\\'])[^"\\']+(["\\'])',
-              r'\\g<1>8.10.1\\2',
-              text,
-          )
-          text, kotlin_count = re.subn(
-              r'(id\\(["\\']org\\.jetbrains\\.kotlin\\.android["\\']\\)\\s+version\\s+["\\'])[^"\\']+(["\\'])',
-              r'\\g<1>2.1.0\\2',
-              text,
-          )
+          agp_pattern = r"""(id\\(["']com\\.android\\.application["']\\)\\s+version\\s+["'])[^"']+(["'])"""
+          kotlin_pattern = r"""(id\\(["']org\\.jetbrains\\.kotlin\\.android["']\\)\\s+version\\s+["'])[^"']+(["'])"""
+          text, agp_count = re.subn(agp_pattern, r"\\g<1>8.10.1\\2", text)
+          text, kotlin_count = re.subn(kotlin_pattern, r"\\g<1>2.1.0\\2", text)
           if agp_count != 1 or kotlin_count != 1:
               raise SystemExit(
-                  f"Could not safely pin generated plugins (AGP matches={agp_count}, "
-                  f"Kotlin matches={kotlin_count}). Review {settings}."
+                  f"Could not safely pin plugins (AGP={agp_count}, Kotlin={kotlin_count})."
               )
           settings.write_text(text)
 
           wrapper = android / "gradle/wrapper/gradle-wrapper.properties"
-          wrapper_text = wrapper.read_text()
-          wrapper_text, wrapper_count = re.subn(
-              r'(?m)^distributionUrl=.*
-      - name: Resolve Flutter dependencies
-        working-directory: .nightlink-build
-        shell: bash
-        run: |
-          set -euo pipefail
-          flutter pub add supabase_flutter livekit_client:^2.13.2 url_launcher image_picker video_player just_audio file_picker share_plus:^10.1.4
-          flutter pub get
-
-      - name: Configure optional release signing
-        shell: bash
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          values=("$KEYSTORE_BASE64" "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD")
-          present=0
-          for value in "${values[@]}"; do
-            if [[ -n "$value" ]]; then present=$((present + 1)); fi
-          done
-
-          if [[ "$present" -eq 0 ]]; then
-            echo "Signing secrets are not configured; using Flutter's debug-keystore fallback for this test APK."
-          elif [[ "$present" -ne 4 ]]; then
-            echo "All four signing secrets are required together: KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD." >&2
-            exit 1
-          else
-            KEYSTORE_PATH="$RUNNER_TEMP/nightlink-release.jks"
-            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
-            test -s "$KEYSTORE_PATH"
-            echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
-            cat >> "$GITHUB_WORKSPACE/.nightlink-build/android/app/build.gradle.kts" <<'KOTLIN'
-
-            android {
-                signingConfigs {
-                    create("nightlinkRelease") {
-                        storeFile = file(System.getenv("KEYSTORE_PATH")!!)
-                        storePassword = System.getenv("KEYSTORE_PASSWORD")
-                        keyAlias = System.getenv("KEY_ALIAS")
-                        keyPassword = System.getenv("KEY_PASSWORD")
-                    }
-                }
-                buildTypes {
-                    getByName("release") {
-                        signingConfig = signingConfigs.getByName("nightlinkRelease")
-                    }
-                }
-            }
-          KOTLIN
-            echo "Release keystore decoded and release signing configured."
-          fi
-
-      - name: Set up Gradle caching
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Build release APK
-        working-directory: .nightlink-build/android
-        shell: bash
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://falimxmpicqaakjnigkv.supabase.co' }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          test -n "$SUPABASE_URL" || { echo "SUPABASE_URL is missing." >&2; exit 1; }
-          test -n "$SUPABASE_PUBLISHABLE_KEY" || { echo "SUPABASE_PUBLISHABLE_KEY secret is missing." >&2; exit 1; }
-
-          DART_DEFINES="$(python3 - <<'PY'
-          import base64
-          import os
-          values = [
-              "SUPABASE_URL=" + os.environ["SUPABASE_URL"],
-              "SUPABASE_PUBLISHABLE_KEY=" + os.environ["SUPABASE_PUBLISHABLE_KEY"],
+          wrapper_lines = wrapper.read_text().splitlines()
+          distribution_lines = [
+              i for i, line in enumerate(wrapper_lines)
+              if line.startswith("distributionUrl=")
           ]
-          print(",".join(base64.b64encode(v.encode()).decode() for v in values))
-          PY
-          )"
-
-          ./gradlew assembleRelease --stacktrace -Pdart-defines="$DART_DEFINES"
-
-      - name: Verify APK
-        shell: bash
-        run: |
-          set -euo pipefail
-          APK=".nightlink-build/android/app/build/outputs/apk/release/app-release.apk"
-          test -s "$APK" || { echo "Release APK was not generated." >&2; exit 1; }
-          ls -lh "$APK"
-
-      - name: Upload release APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: NightLink-Android-Release-APK
-          path: .nightlink-build/android/app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
-          retention-days: 14
-,
-              r'distributionUrl=https\\\\://services.gradle.org/distributions/gradle-8.11.1-all.zip',
-              wrapper_text,
+          if len(distribution_lines) != 1:
+              raise SystemExit("Could not safely pin the Gradle wrapper.")
+          wrapper_lines[distribution_lines[0]] = (
+              "distributionUrl=https\\\\://services.gradle.org/distributions/gradle-8.11.1-all.zip"
           )
-          if wrapper_count != 1:
-              raise SystemExit("Could not safely pin the Gradle wrapper distribution.")
-          wrapper.write_text(wrapper_text)
-          print("Pinned Android Gradle Plugin 8.10.1, Kotlin Gradle Plugin 2.1.0, Gradle 8.11.1.")
+          wrapper.write_text("\\n".join(wrapper_lines) + "\\n")
+          print("Pinned AGP 8.10.1, Kotlin 2.1.0, Gradle 8.11.1.")
           PY
 
           chmod +x "$BUILD_DIR/android/gradlew"
