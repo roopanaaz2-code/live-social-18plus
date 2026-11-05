@@ -139,7 +139,7 @@ jobs:
                     }
                 }
             }
-            KOTLIN
+          KOTLIN
             echo "Release keystore decoded and release signing configured."
           fi
 
