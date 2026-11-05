@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'matchmaking.dart';
 import 'chat.dart';
+import 'live_call.dart';
 
 const supabaseUrl = String.fromEnvironment(
   'SUPABASE_URL',
@@ -397,22 +398,6 @@ class _LoginScreenState extends State<LoginScreen> {
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  void _notReady(BuildContext context, String feature) {
-    showDialog<void>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF11182B),
-        title: Text('$feature is being connected', style: const TextStyle(color: gold)),
-        content: const Text(
-          'This feature is not live yet. We are connecting it securely to LiveKit so it works with real people, not a demo screen.',
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -460,7 +445,7 @@ class HomeScreen extends StatelessWidget {
             title: 'VOICE CHAT',
             subtitle: 'Talk live with other members',
             color: blue,
-            onTap: () => _notReady(context, 'Voice chat'),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CallContactsScreen(mode: NightLinkCallMode.voice))),
           ),
           const SizedBox(height: 12),
           _HomeActionCard(
@@ -468,7 +453,7 @@ class HomeScreen extends StatelessWidget {
             title: 'VIDEO CHAT',
             subtitle: 'Meet face-to-face in live rooms',
             color: gold,
-            onTap: () => _notReady(context, 'Video chat'),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CallContactsScreen(mode: NightLinkCallMode.video))),
           ),
           const SizedBox(height: 12),
           _HomeActionCard(
