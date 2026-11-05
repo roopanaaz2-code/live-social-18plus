@@ -89,8 +89,22 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
       await room.connect(
         serverUrl,
         token,
-        roomOptions: const RoomOptions(adaptiveStream: true, dynacast: true),
+        roomOptions: RoomOptions(
+          adaptiveStream: true,
+          dynacast: true,
+          defaultAudioCaptureOptions: const AudioCaptureOptions(
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            highPassFilter: true,
+            voiceIsolation: true,
+            typingNoiseDetection: true,
+          ),
+        ),
       );
+      // Live battles are video rooms, so route audio to the loudspeaker.
+      // Echo cancellation and noise suppression above help reduce feedback.
+      await AudioManager.instance.setSpeakerOutputPreferred(true);
       if (_isPlayer) {
         await room.localParticipant?.setMicrophoneEnabled(true);
         await room.localParticipant?.setCameraEnabled(true);
