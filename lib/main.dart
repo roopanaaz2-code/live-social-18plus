@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'matchmaking.dart';
+import 'chat.dart';
 
 const supabaseUrl = String.fromEnvironment(
   'SUPABASE_URL',
@@ -396,6 +397,23 @@ class _LoginScreenState extends State<LoginScreen> {
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
+  void _notReady(BuildContext context, String feature) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF11182B),
+        title: Text('$feature is being connected', style: const TextStyle(color: gold)),
+        content: const Text(
+          'This feature is not live yet. We are connecting it securely to LiveKit so it works with real people, not a demo screen.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
@@ -404,79 +422,96 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: dark,
-        title: const Text(
-          'NIGHTLINK',
-          style: TextStyle(color: gold, fontWeight: FontWeight.bold),
-        ),
+        title: const Text('NIGHTLINK', style: TextStyle(color: gold, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             tooltip: 'Sign out',
             icon: const Icon(Icons.logout, color: blue),
-            onPressed: () async {
-              await Supabase.instance.client.auth.signOut();
-            },
+            onPressed: () async => Supabase.instance.client.auth.signOut(),
           ),
         ],
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(25),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.verified_user, color: gold, size: 65),
-              const SizedBox(height: 20),
-              Text(
-                'Welcome, $name!',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                user?.email ?? '',
-                style: const TextStyle(color: Colors.white60),
-              ),
-              const SizedBox(height: 30),
-              const Text(
-                'YOUR NIGHTLINK ACCOUNT IS CONNECTED',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: blue, letterSpacing: 1),
-              ),
-              const SizedBox(height: 28),
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: gold,
-                    foregroundColor: dark,
-                  ),
-                  icon: const Icon(Icons.sports_esports),
-                  label: const Text(
-                    'FIND A MATCH',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const MatchLobby()),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 15),
-              const Text(
-                'Text, voice, and video rooms connect to the match after the room service is configured.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white38, height: 1.4),
-              ),
-            ],
+      body: ListView(
+        padding: const EdgeInsets.all(22),
+        children: [
+          const SizedBox(height: 18),
+          const Icon(Icons.nightlight_round, color: gold, size: 58),
+          const SizedBox(height: 14),
+          Text('Welcome, $name!', textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(user?.email ?? '', textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white60)),
+          const SizedBox(height: 12),
+          const Text('CHOOSE HOW YOU WANT TO CONNECT',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: blue, letterSpacing: 1, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 22),
+          _HomeActionCard(
+            icon: Icons.chat_bubble_outline,
+            title: 'TEXT CHAT',
+            subtitle: 'Send private real-time messages',
+            color: gold,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen())),
           ),
-        ),
+          const SizedBox(height: 12),
+          _HomeActionCard(
+            icon: Icons.mic_none,
+            title: 'VOICE CHAT',
+            subtitle: 'Talk live with other members',
+            color: blue,
+            onTap: () => _notReady(context, 'Voice chat'),
+          ),
+          const SizedBox(height: 12),
+          _HomeActionCard(
+            icon: Icons.videocam_outlined,
+            title: 'VIDEO CHAT',
+            subtitle: 'Meet face-to-face in live rooms',
+            color: gold,
+            onTap: () => _notReady(context, 'Video chat'),
+          ),
+          const SizedBox(height: 12),
+          _HomeActionCard(
+            icon: Icons.sports_esports,
+            title: 'FIND A MATCH',
+            subtitle: '1v1 duels and team battles',
+            color: blue,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MatchLobby())),
+          ),
+        ],
       ),
     );
   }
+}
+
+class _HomeActionCard extends StatelessWidget {
+  const _HomeActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    color: const Color(0xFF11182B),
+    child: ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      leading: CircleAvatar(
+        backgroundColor: color.withOpacity(.14),
+        child: Icon(icon, color: color),
+      ),
+      title: Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+      subtitle: Text(subtitle, style: const TextStyle(color: Colors.white60)),
+      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white54),
+      onTap: onTap,
+    ),
+  );
 }
