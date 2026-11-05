@@ -186,7 +186,7 @@ jobs:
           adb start-server
           adb wait-for-device
           for attempt in $(seq 1 120); do
-            booted="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r' || true)"
+            booted="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
             if [ "$booted" = "1" ]; then
               echo "Android 15 emulator boot completed."
               break
