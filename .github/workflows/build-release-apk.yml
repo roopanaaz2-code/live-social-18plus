@@ -102,8 +102,8 @@ jobs:
               raise SystemExit("Generated Android settings.gradle file was not found.")
 
           text = settings.read_text()
-          agp_pattern = r"""(id\(["']com\.android\.application["']\)\s+version\s+["'])[^"']+(["'])"""
-          kotlin_pattern = r"""(id\(["']org\.jetbrains\.kotlin\.android["']\)\s+version\s+["'])[^"']+(["'])"""
+          agp_pattern = r"""(id\s*\(?\s*["']com\.android\.application["']\s*\)?\s+version\s+["'])[^"']+(["'])"""
+          kotlin_pattern = r"""(id\s*\(?\s*["']org\.jetbrains\.kotlin\.android["']\s*\)?\s+version\s+["'])[^"']+(["'])"""
           text, agp_count = re.subn(agp_pattern, r"\g<1>8.10.1\2", text)
           text, kotlin_count = re.subn(kotlin_pattern, r"\g<1>2.1.0\2", text)
           if agp_count != 1 or kotlin_count != 1:
