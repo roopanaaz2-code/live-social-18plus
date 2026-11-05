@@ -36,9 +36,19 @@ jobs:
           manifest = Path(os.environ["RUNNER_TEMP"]) / "nightlink/android/app/src/main/AndroidManifest.xml"
           text = manifest.read_text()
           permission = '    <uses-permission android:name="android.permission.INTERNET" />\n'
-          if 'android.permission.INTERNET' not in text:
-              text = text.replace('<application', permission + '    <application', 1)
-              manifest.write_text(text)
+          permissions = [
+              '    <uses-permission android:name="android.permission.INTERNET" />',
+              '    <uses-permission android:name="android.permission.CAMERA" />',
+              '    <uses-permission android:name="android.permission.RECORD_AUDIO" />',
+              '    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />',
+              '    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />',
+              '    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />',
+          ]
+          for permission in permissions:
+              permission_name = permission.split('name="')[1].split('"')[0]
+              if permission_name not in text:
+                  text = text.replace('<application', permission + '\\n    <application', 1)
+          manifest.write_text(text)
           PY
 
       - name: Add NightLink app code
@@ -48,7 +58,7 @@ jobs:
       - name: Install Supabase dependency
         working-directory: ${{ runner.temp }}/nightlink
         run: |
-          flutter pub add supabase_flutter
+          flutter pub add supabase_flutter livekit_client:^2.13.2
           flutter pub get
 
       - name: Build Android APK
