@@ -191,21 +191,21 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Enable KVM permissions for Android emulator
+      - name: Enable KVM Hardware Acceleration
         shell: bash
         run: |
           set -euo pipefail
           if [ -e /dev/kvm ]; then
             echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
             sudo udevadm control --reload-rules
-            sudo udevadm trigger --name-match=kvm
+            sudo udevadm trigger --name-match=kvm || true
             if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
-              echo "KVM is accessible to the runner."
+              echo "KVM hardware acceleration is available."
             else
-              echo "::warning::KVM exists but is not accessible; emulator will use software acceleration."
+              echo "::warning::KVM exists but is not accessible; emulator may use software acceleration."
             fi
           else
-            echo "::warning::/dev/kvm is unavailable on this runner; emulator will use software acceleration."
+            echo "::warning::/dev/kvm is unavailable; emulator must use software acceleration."
           fi
 
       - name: Start Android 15 emulator
