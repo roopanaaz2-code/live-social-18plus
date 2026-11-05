@@ -1,6 +1,10 @@
 
 name: NightLink Android APK Builder
 
+concurrency:
+  group: nightlink-android-apk
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
   push:
