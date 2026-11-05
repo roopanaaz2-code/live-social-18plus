@@ -120,7 +120,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          flutter pub add supabase_flutter livekit_client:^2.13.2 url_launcher image_picker video_player just_audio file_picker share_plus:^10.1.4
+          flutter pub add supabase_flutter livekit_client:^2.13.2 url_launcher image_picker video_player just_audio file_picker:10.3.3 share_plus:^10.1.4
           flutter pub get
 
       - name: Check Supabase configuration
