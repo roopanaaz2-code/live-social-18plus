@@ -429,14 +429,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadVip() async {
     try {
       final client = Supabase.instance.client;
-      final values = await Future.wait([
-        client.rpc('has_vip_access'),
-        client.from('profiles').select('display_name')
-            .eq('id', client.auth.currentUser!.id).maybeSingle(),
-      ]);
-      final profile = values[1] as Map<String, dynamic>?;
+      final vipValue = await client.rpc('has_vip_access');
+      final profile = await client.from('profiles').select('display_name')
+          .eq('id', client.auth.currentUser!.id).maybeSingle();
       if (mounted) setState(() {
-        _hasVip = values[0] == true;
+        _hasVip = vipValue == true;
         _profileName = profile?['display_name']?.toString();
         _vipLoading = false;
       });
