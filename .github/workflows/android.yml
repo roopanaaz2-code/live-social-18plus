@@ -1,97 +1,123 @@
-
 name: NightLink Android APK Builder
 
-concurrency:
-  group: nightlink-android-apk
-  cancel-in-progress: true
-
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: nightlink-android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
+    name: Build NightLink release APK
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
-      - name: Get source code
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Install Flutter
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
 
-      - name: Create Flutter Android project
+      - name: Create Android project and configure permissions
+        shell: bash
         run: |
-          flutter create \
-            --project-name nightlink \
-            --org com.nightlink \
-            "$RUNNER_TEMP/nightlink"
+          set -euo pipefail
+          flutter create --project-name nightlink --org com.nightlink "$RUNNER_TEMP/nightlink"
+
           python3 - <<'PY'
           import os
           from pathlib import Path
 
           manifest = Path(os.environ["RUNNER_TEMP"]) / "nightlink/android/app/src/main/AndroidManifest.xml"
-          text = manifest.read_text()
-          permission = '    <uses-permission android:name="android.permission.INTERNET" />\n'
+          content = manifest.read_text()
           permissions = [
-              '    <uses-permission android:name="android.permission.INTERNET" />',
-              '    <uses-permission android:name="android.permission.CAMERA" />',
-              '    <uses-permission android:name="android.permission.RECORD_AUDIO" />',
-              '    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />',
-              '    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />',
-              '    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />',
+              "android.permission.INTERNET",
+              "android.permission.CAMERA",
+              "android.permission.RECORD_AUDIO",
+              "android.permission.ACCESS_NETWORK_STATE",
+              "android.permission.CHANGE_NETWORK_STATE",
+              "android.permission.MODIFY_AUDIO_SETTINGS",
           ]
-          for permission in permissions:
-              permission_name = permission.split('name="')[1].split('"')[0]
-              if permission_name not in text:
-                  text = text.replace('<application', permission + '\n    <application', 1)
-          manifest.write_text(text)
+          for name in permissions:
+              tag = f'    <uses-permission android:name="{name}" />'
+              if name not in content:
+                  content = content.replace("<application", tag + "\\n    <application", 1)
+          manifest.write_text(content)
           PY
-          # Align Kotlin compilation for every Android plugin with Java 11.
-          # Use the modern compilerOptions DSL (Kotlin 2.x).
+
+          # Flutter's generated Android project compiles Java with JVM 17.
+          # Force every Android plugin's Java and Kotlin tasks to the same target.
           cat >> "$RUNNER_TEMP/nightlink/android/build.gradle.kts" <<'KOTLIN'
-          
+
           subprojects {
               tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-                  compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+                  compilerOptions {
+                      jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+                  }
+              }
+              tasks.withType<JavaCompile>().configureEach {
+                  sourceCompatibility = JavaVersion.VERSION_17.toString()
+                  targetCompatibility = JavaVersion.VERSION_17.toString()
               }
           }
           KOTLIN
 
-      - name: Add NightLink app code
+      - name: Install NightLink application source
+        shell: bash
         run: |
+          set -euo pipefail
+          test -f lib/main.dart || { echo "lib/main.dart is missing from the repository" >&2; exit 1; }
           cp -R lib/. "$RUNNER_TEMP/nightlink/lib/"
 
-      - name: Install Supabase dependency
+      - name: Resolve Flutter dependencies
         working-directory: ${{ runner.temp }}/nightlink
+        shell: bash
         run: |
+          set -euo pipefail
           flutter pub add supabase_flutter livekit_client:^2.13.2 url_launcher image_picker video_player just_audio file_picker share_plus:^10.1.4
           flutter pub get
 
-      - name: Build Android APK
+      - name: Build release APK
         working-directory: ${{ runner.temp }}/nightlink
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://falimxmpicqaakjnigkv.supabase.co' }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        shell: bash
         run: |
-          test -n "$SUPABASE_PUBLISHABLE_KEY" || (echo 'SUPABASE_PUBLISHABLE_KEY secret is missing' >&2; exit 1)
-          build_args=(flutter build apk --release)
-          if [ -n "$SUPABASE_URL" ]; then
-            build_args+=(--dart-define=SUPABASE_URL="$SUPABASE_URL")
-          fi
-          build_args+=(--dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY")
-          "${build_args[@]}"
+          set -euo pipefail
+          test -n "$SUPABASE_URL" || { echo "SUPABASE_URL is missing" >&2; exit 1; }
+          test -n "$SUPABASE_PUBLISHABLE_KEY" || { echo "SUPABASE_PUBLISHABLE_KEY secret is missing" >&2; exit 1; }
+          flutter build apk --release --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
 
-      - name: Upload APK
+      - name: Verify APK
+        working-directory: ${{ runner.temp }}/nightlink
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          test -s "$APK" || { echo "APK was not generated or is empty" >&2; exit 1; }
+          ls -lh "$APK"
+
+      - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
           name: NightLink-Android-APK
           path: ${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 7
+          if-no-files-found: error
+          retention-days: 14
