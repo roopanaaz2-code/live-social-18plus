@@ -208,6 +208,19 @@ jobs:
             echo "::warning::/dev/kvm is unavailable; emulator must use software acceleration."
           fi
 
+      - name: Install Android emulator Linux runtime libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends libpulse0
+          echo "Checking emulator runtime dependencies..."
+          ldd "${ANDROID_HOME}/emulator/qemu/linux-x86_64/qemu-system-x86_64" | tee "${RUNNER_TEMP}/nightlink-emulator-dependencies.log"
+          if grep -q "not found" "${RUNNER_TEMP}/nightlink-emulator-dependencies.log"; then
+            echo "::error::Android emulator still has unresolved Linux shared-library dependencies." >&2
+            exit 1
+          fi
+
       - name: Start Android 15 emulator
         shell: bash
         timeout-minutes: 15
