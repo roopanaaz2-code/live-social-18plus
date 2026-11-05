@@ -310,10 +310,12 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
                 value: _selectedRecipientId,
                 decoration: const InputDecoration(labelText: 'Send to host'),
                 dropdownColor: const Color(0xFF17233A),
-                items: _players.map((p) => DropdownMenuItem(
-                  value: p['user_id'].toString(),
-                  child: Text((p['display_name'] ?? 'Host').toString()),
-                )).toList(),
+                items: _players
+                    .where((p) => !_isPlayer || p['user_id'].toString() != _myId)
+                    .map((p) => DropdownMenuItem(
+                      value: p['user_id'].toString(),
+                      child: Text((p['display_name'] ?? 'Host').toString()),
+                    )).toList(),
                 onChanged: (value) => setState(() => _selectedRecipientId = value),
               ),
               const SizedBox(height: 12),
