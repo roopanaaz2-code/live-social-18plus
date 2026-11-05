@@ -140,7 +140,10 @@ class _NightLinkFeedScreenState extends State<NightLinkFeedScreen> {
       if (music == null) return;
 
       final videoExt = video.path.split('.').last.toLowerCase();
-      final safeVideoExt = ['mp4', 'mov', 'webm'].contains(videoExt) ? videoExt : 'mp4';
+      if (!['mp4', 'mov', 'webm'].contains(videoExt)) {
+        throw Exception('Please use an MP4, MOV or WEBM video.');
+      }
+      final safeVideoExt = videoExt;
       final stamp = DateTime.now().microsecondsSinceEpoch;
       final videoPath = '$_myId/$stamp.$safeVideoExt';
       await _db.storage.from('nightlink-videos').upload(
@@ -154,7 +157,10 @@ class _NightLinkFeedScreenState extends State<NightLinkFeedScreen> {
       if (music['type'] == 'device') {
         final audioFile = music['file'] as File;
         final ext = audioFile.path.split('.').last.toLowerCase();
-        final safeExt = ['mp3', 'm4a', 'aac', 'wav', 'ogg'].contains(ext) ? ext : 'mp3';
+        if (!['mp3', 'm4a', 'aac', 'wav', 'ogg'].contains(ext)) {
+          throw Exception('Please choose an MP3, M4A, AAC, WAV or OGG audio file.');
+        }
+        final safeExt = ext;
         audioPath = '$_myId/$stamp.$safeExt';
         await _db.storage.from('nightlink-audio').upload(
           audioPath, audioFile,
