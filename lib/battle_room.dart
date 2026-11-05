@@ -28,6 +28,7 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
   List<Map<String, dynamic>> _players = [];
   List<Map<String, dynamic>> _scores = [];
   List<Map<String, dynamic>> _likes = [];
+  List<Map<String, dynamic>> _profileLikes = [];
   List<Map<String, dynamic>> _gifts = [];
   List<Map<String, dynamic>> _comments = [];
   List<Map<String, dynamic>> _giftEvents = [];
@@ -143,12 +144,16 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
           .eq('match_id', widget.matchId).order('created_at', ascending: false).limit(20),
       _db.from('battle_scores').select('team_no, score').eq('match_id', widget.matchId),
       _db.from('battle_likes').select('host_id, viewer_id').eq('match_id', widget.matchId),
+      _db.from('profile_likes').select('profile_id, viewer_id').inFilter(
+        'profile_id', _players.map((p) => p['user_id'].toString()).toList(),
+      ),
     ]);
     _gifts = (results[0] as List).cast<Map<String, dynamic>>();
     _comments = (results[1] as List).cast<Map<String, dynamic>>().reversed.toList();
     _giftEvents = (results[2] as List).cast<Map<String, dynamic>>();
     _scores = (results[3] as List).cast<Map<String, dynamic>>();
     _likes = (results[4] as List).cast<Map<String, dynamic>>();
+    _profileLikes = (results[5] as List).cast<Map<String, dynamic>>();
     if (_selectedRecipientId == null && _players.isNotEmpty) {
       _selectedRecipientId = _players.first['user_id']?.toString();
       if (_selectedRecipientId == _myId && _players.length > 1) {
@@ -485,7 +490,7 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
     return teams.isEmpty ? [1, 2] : teams;
   }
 
-  int _hostLikeCount(String hostId) => _likes.where((row) => row['host_id'].toString() == hostId).length;
+  int _hostLikeCount(String hostId) => _profileLikes.where((row) => row['profile_id'].toString() == hostId).length;
 
   int _teamScore(int team) {
     for (final row in _scores) {
