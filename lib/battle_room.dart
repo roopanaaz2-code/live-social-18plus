@@ -27,7 +27,6 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
   Duration _remaining = const Duration(minutes: 4);
   List<Map<String, dynamic>> _players = [];
   List<Map<String, dynamic>> _scores = [];
-  List<Map<String, dynamic>> _likes = [];
   List<Map<String, dynamic>> _profileLikes = [];
   List<Map<String, dynamic>> _gifts = [];
   List<Map<String, dynamic>> _comments = [];
@@ -143,17 +142,16 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
           .select('id, sender_id, recipient_id, team_no, gift_key, quantity, score_added, sender_name, recipient_name, gift_name, gift_emoji, created_at')
           .eq('match_id', widget.matchId).order('created_at', ascending: false).limit(20),
       _db.from('battle_scores').select('team_no, score').eq('match_id', widget.matchId),
-      _db.from('battle_likes').select('host_id, viewer_id').eq('match_id', widget.matchId),
-      _db.from('profile_likes').select('profile_id, viewer_id').inFilter(
-        'profile_id', _players.map((p) => p['user_id'].toString()).toList(),
-      ),
     ]);
     _gifts = (results[0] as List).cast<Map<String, dynamic>>();
     _comments = (results[1] as List).cast<Map<String, dynamic>>().reversed.toList();
     _giftEvents = (results[2] as List).cast<Map<String, dynamic>>();
     _scores = (results[3] as List).cast<Map<String, dynamic>>();
-    _likes = (results[4] as List).cast<Map<String, dynamic>>();
-    _profileLikes = (results[5] as List).cast<Map<String, dynamic>>();
+    final playerIds = _players.map((p) => p['user_id'].toString()).toList();
+    _profileLikes = playerIds.isEmpty
+        ? []
+        : List<Map<String, dynamic>>.from(await _db.from('profile_likes')
+            .select('profile_id, viewer_id').inFilter('profile_id', playerIds));
     if (_selectedRecipientId == null && _players.isNotEmpty) {
       _selectedRecipientId = _players.first['user_id']?.toString();
       if (_selectedRecipientId == _myId && _players.length > 1) {
