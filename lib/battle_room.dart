@@ -417,7 +417,11 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
     final team = (player['team_no'] as num?)?.toInt() ?? 1;
     final score = _teamScore(team);
     return GestureDetector(
-      onTap: () => setState(() => _selectedRecipientId = userId),
+      onTap: () {
+        if (!_isPlayer || userId != _myId) {
+          setState(() => _selectedRecipientId = userId);
+        }
+      },
       onDoubleTap: () => _doubleTapLike(userId),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
@@ -465,6 +469,11 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
         ),
       ),
     );
+  }
+
+  List<int> get _teamNumbers {
+    final teams = _scores.map((row) => (row['team_no'] as num?)?.toInt() ?? 1).toSet().toList()..sort();
+    return teams.isEmpty ? [1, 2] : teams;
   }
 
   int _teamScore(int team) {
@@ -577,7 +586,7 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
             child: Row(children: [
-              for (int team = 1; team <= 2; team++)
+              for (final team in _teamNumbers)
                 Expanded(child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   padding: const EdgeInsets.all(10),
