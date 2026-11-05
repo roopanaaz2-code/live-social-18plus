@@ -53,7 +53,7 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Invalid or expired session" }, 401);
     }
 
-    let body: { roomName?: unknown; matchId?: unknown };
+    let body: { roomName?: unknown; matchId?: unknown; invitationId?: unknown };
     try {
       body = await req.json();
     } catch {
@@ -65,6 +65,9 @@ Deno.serve(async (req: Request) => {
     const matchId = body.matchId;
 
     if (matchId !== undefined && matchId !== null) {
+      if (body.invitationId !== undefined && body.invitationId !== null) {
+        return json({ error: "Choose either a battle or a call invitation" }, 400);
+      }
       if (typeof matchId !== "string" ||
           !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(matchId)) {
         return json({ error: "Invalid battle ID" }, 400);
@@ -88,11 +91,64 @@ Deno.serve(async (req: Request) => {
       const endsAt = access.battle_ends_at ? Date.parse(String(access.battle_ends_at)) : 0;
       canPublish = access.is_player === true && (endsAt === 0 || endsAt > Date.now());
     } else {
-      if (typeof body.roomName !== "string" ||
-          !/^[a-zA-Z0-9_-]{1,64}$/.test(body.roomName)) {
-        return json({ error: "Invalid room name" }, 400);
+      let invitationResult;
+
+      if (body.invitationId !== undefined && body.invitationId !== null) {
+        if (typeof body.invitationId !== "string" ||
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.invitationId)) {
+          return json({ error: "Invalid call invitation ID" }, 400);
+        }
+        invitationResult = await supabase
+          .from("call_invitations")
+          .select("id, caller_id, receiver_id, call_mode, room_name, status")
+          .eq("id", body.invitationId)
+          .eq("status", "accepted")
+          .maybeSingle();
+      } else if (typeof body.roomName === "string" &&
+                 /^[a-zA-Z0-9_-]{1,64}$/.test(body.roomName)) {
+        // Backwards-compatible path for older APKs, but still require an
+        // accepted invitation visible to this authenticated participant.
+        invitationResult = await supabase
+          .from("call_invitations")
+          .select("id, caller_id, receiver_id, call_mode, room_name, status")
+          .eq("room_name", body.roomName)
+          .eq("status", "accepted")
+          .maybeSingle();
+      } else {
+        return json({ error: "An accepted call invitation is required" }, 400);
       }
-      roomName = body.roomName;
+
+      const { data: invitation, error: invitationError } = invitationResult;
+      if (invitationError || !invitation) {
+        return json({ error: "No accepted call invitation was found for this account" }, 403);
+      }
+
+      const userId = userData.user.id;
+      if (invitation.caller_id !== userId && invitation.receiver_id !== userId) {
+        return json({ error: "You are not a participant in this call" }, 403);
+      }
+
+      if (invitation.call_mode !== "voice" && invitation.call_mode !== "video") {
+        return json({ error: "Invalid call mode" }, 403);
+      }
+
+      const participantIds = [
+        String(invitation.caller_id),
+        String(invitation.receiver_id),
+      ].sort();
+      const compactId = (id: string) => id.replaceAll("-", "").slice(0, 24);
+      const expectedRoomName =
+        `${invitation.call_mode}_${compactId(participantIds[0])}_${compactId(participantIds[1])}`;
+
+      if (invitation.room_name !== expectedRoomName ||
+          (typeof body.roomName === "string" && body.roomName !== expectedRoomName)) {
+        return json({ error: "Call room does not match the accepted participants" }, 403);
+      }
+
+      // The invitation query is protected by call_invitations RLS, so only
+      // the two connected participants can receive tokens for this private room.
+      roomName = expectedRoomName;
+      canPublish = true;
     }
 
     const livekitUrl = Deno.env.get("LIVEKIT_URL");
