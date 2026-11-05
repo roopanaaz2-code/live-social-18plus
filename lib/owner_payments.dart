@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-const _ownerEmail = 'roopanaaz2@gmail.com';
+const _ownerUserId = 'fcdb86f2-1fce-4f7a-8d84-f1ace7df12cd';
 const _gold = Color(0xFFFFC857);
 const _blue = Color(0xFF2589FF);
 const _dark = Color(0xFF090D18);
@@ -26,8 +26,8 @@ class _OwnerPaymentsScreenState extends State<OwnerPaymentsScreen> {
   }
 
   Future<void> _load() async {
-    final email = _client.auth.currentUser?.email?.toLowerCase();
-    if (email != _ownerEmail) {
+    final userId = _client.auth.currentUser?.id;
+    if (userId != _ownerUserId) {
       setState(() {
         _loading = false;
         _error = 'This dashboard is restricted to the owner account.';
@@ -57,8 +57,8 @@ class _OwnerPaymentsScreenState extends State<OwnerPaymentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final email = _client.auth.currentUser?.email?.toLowerCase();
-    if (email != _ownerEmail) {
+    final userId = _client.auth.currentUser?.id;
+    if (userId != _ownerUserId) {
       return const Scaffold(
         backgroundColor: _dark,
         body: Center(child: Text('Access denied', style: TextStyle(color: Colors.redAccent))),
