@@ -70,7 +70,7 @@ class _CoinWalletScreenState extends State<CoinWalletScreen>
       backgroundColor: _dark,
       appBar: AppBar(
         backgroundColor: _dark,
-        title: const Text('COINS & GIFTS', style: TextStyle(color: _gold, fontWeight: FontWeight.bold)),
+        title: const Text('COINS WALLET', style: TextStyle(color: _gold, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh, color: _blue)),
         ],
