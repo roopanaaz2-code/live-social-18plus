@@ -159,6 +159,177 @@ class _CallContactsScreenState extends State<CallContactsScreen> {
   }
 }
 
+class IncomingCallOverlay extends StatefulWidget {
+  const IncomingCallOverlay({super.key, required this.child});
+  final Widget child;
+
+  @override
+  State<IncomingCallOverlay> createState() => _IncomingCallOverlayState();
+}
+
+class _IncomingCallOverlayState extends State<IncomingCallOverlay> {
+  final _client = Supabase.instance.client;
+  RealtimeChannel? _channel;
+  Map<String, dynamic>? _invite;
+  String _callerName = 'NightLink member';
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPending();
+    final userId = _client.auth.currentUser?.id;
+    if (userId != null) {
+      _channel = _client
+          .channel('global-incoming-calls-$userId')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'call_invitations',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'receiver_id',
+              value: userId,
+            ),
+            callback: (_) => _loadPending(),
+          )
+          .subscribe();
+    }
+  }
+
+  Future<void> _loadPending() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      final row = await _client
+          .from('call_invitations')
+          .select('id, caller_id, call_mode, room_name, expires_at')
+          .eq('receiver_id', userId)
+          .eq('status', 'pending')
+          .gt('expires_at', DateTime.now().toUtc().toIso8601String())
+          .order('created_at')
+          .limit(1)
+          .maybeSingle();
+      if (!mounted) return;
+      if (row == null) {
+        setState(() => _invite = null);
+        return;
+      }
+      var name = 'NightLink member';
+      try {
+        final profile = await _client
+            .from('profiles')
+            .select('display_name, username')
+            .eq('id', row['caller_id'])
+            .maybeSingle();
+        name = (profile?['display_name'] ?? profile?['username'] ?? name).toString();
+      } catch (_) {}
+      if (!mounted) return;
+      setState(() {
+        _invite = Map<String, dynamic>.from(row);
+        _callerName = name;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _respond(bool accept) async {
+    final invite = _invite;
+    if (invite == null || _busy) return;
+    setState(() => _busy = true);
+    try {
+      await _client
+          .from('call_invitations')
+          .update({'status': accept ? 'accepted' : 'declined'})
+          .eq('id', invite['id'])
+          .eq('status', 'pending');
+      if (!mounted) return;
+      setState(() => _invite = null);
+      if (accept) {
+        final mode = invite['call_mode'] == 'video'
+            ? NightLinkCallMode.video
+            : NightLinkCallMode.voice;
+        await Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => LiveCallScreen(
+            mode: mode,
+            otherName: _callerName,
+            roomName: invite['room_name'].toString(),
+          ),
+        ));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not respond to call: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    final channel = _channel;
+    if (channel != null) _client.removeChannel(channel);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    children: [
+      widget.child,
+      if (_invite != null)
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 10,
+          left: 12,
+          right: 12,
+          child: Material(
+            color: const Color(0xFF182642),
+            elevation: 18,
+            borderRadius: BorderRadius.circular(18),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(_invite!['call_mode'] == 'video' ? Icons.videocam : Icons.call,
+                        color: _gold, size: 28),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(
+                      _invite!['call_mode'] == 'video' ? 'INCOMING VIDEO CALL' : 'INCOMING VOICE CALL',
+                      style: const TextStyle(color: _gold, fontWeight: FontWeight.bold),
+                    )),
+                  ]),
+                  const SizedBox(height: 10),
+                  Text('$_callerName is calling you.',
+                      style: const TextStyle(color: Colors.white, fontSize: 15)),
+                  const SizedBox(height: 16),
+                  Row(children: [
+                    Expanded(child: ElevatedButton.icon(
+                      onPressed: _busy ? null : () => _respond(false),
+                      icon: const Icon(Icons.call_end),
+                      label: const Text('DECLINE'),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                    )),
+                    const SizedBox(width: 12),
+                    Expanded(child: ElevatedButton.icon(
+                      onPressed: _busy ? null : () => _respond(true),
+                      icon: const Icon(Icons.call),
+                      label: const Text('ACCEPT'),
+                      style: ElevatedButton.styleFrom(backgroundColor: _gold, foregroundColor: _dark),
+                    )),
+                  ]),
+                ],
+              ),
+            ),
+          ),
+        ),
+    ],
+  );
+}
+
 class OutgoingCallScreen extends StatefulWidget {
   const OutgoingCallScreen({
     super.key,
