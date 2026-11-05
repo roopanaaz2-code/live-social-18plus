@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:share_plus/share_plus.dart';
@@ -306,11 +305,13 @@ class _NightLinkFeedScreenState extends State<NightLinkFeedScreen> {
     if (post['shared_by_me'] == true) return;
     try {
       final url = _db.storage.from('nightlink-videos').getPublicUrl(post['video_path'].toString());
-      await _db.from('video_post_interactions').insert({
-        'post_id': post['id'], 'user_id': _myId, 'action': 'share',
-      });
-      await Share.share('Watch this NightLink video: $url');
-      await _loadFeed();
+      final result = await Share.share('Watch this NightLink video: $url');
+      if (result.status == ShareResultStatus.success) {
+        await _db.from('video_post_interactions').insert({
+          'post_id': post['id'], 'user_id': _myId, 'action': 'share',
+        });
+        await _loadFeed();
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
