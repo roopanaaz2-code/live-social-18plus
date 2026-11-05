@@ -102,10 +102,10 @@ jobs:
               raise SystemExit("Generated Android settings.gradle file was not found.")
 
           text = settings.read_text()
-          agp_pattern = r"""(id\\(["']com\\.android\\.application["']\\)\\s+version\\s+["'])[^"']+(["'])"""
-          kotlin_pattern = r"""(id\\(["']org\\.jetbrains\\.kotlin\\.android["']\\)\\s+version\\s+["'])[^"']+(["'])"""
-          text, agp_count = re.subn(agp_pattern, r"\\g<1>8.10.1\\2", text)
-          text, kotlin_count = re.subn(kotlin_pattern, r"\\g<1>2.1.0\\2", text)
+          agp_pattern = r"""(id\(["']com\.android\.application["']\)\s+version\s+["'])[^"']+(["'])"""
+          kotlin_pattern = r"""(id\(["']org\.jetbrains\.kotlin\.android["']\)\s+version\s+["'])[^"']+(["'])"""
+          text, agp_count = re.subn(agp_pattern, r"\g<1>8.10.1\2", text)
+          text, kotlin_count = re.subn(kotlin_pattern, r"\g<1>2.1.0\2", text)
           if agp_count != 1 or kotlin_count != 1:
               raise SystemExit(
                   f"Could not safely pin plugins (AGP={agp_count}, Kotlin={kotlin_count})."
@@ -121,9 +121,9 @@ jobs:
           if len(distribution_lines) != 1:
               raise SystemExit("Could not safely pin the Gradle wrapper.")
           wrapper_lines[distribution_lines[0]] = (
-              "distributionUrl=https\\\\://services.gradle.org/distributions/gradle-8.11.1-all.zip"
+              "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.11.1-all.zip"
           )
-          wrapper.write_text("\\n".join(wrapper_lines) + "\\n")
+          wrapper.write_text("\n".join(wrapper_lines) + "\n")
           print("Pinned AGP 8.10.1, Kotlin 2.1.0, Gradle 8.11.1.")
           PY
 
