@@ -82,18 +82,6 @@ jobs:
                   "\n".join(missing) + "\n    <application",
                   1,
               )
-          # The Google Mobile Ads SDK installs a startup ContentProvider that
-          # requires an application ID even when ads are disabled in Dart.
-          # Use the official Google test app ID until a real AdMob ID is configured.
-          app_id = os.environ.get("ADMOB_ANDROID_APP_ID", "").strip()
-          if not app_id:
-              app_id = "ca-app-pub-3940256099942544~3347511713"
-          if "com.google.android.gms.ads.APPLICATION_ID" not in content:
-              metadata = (
-                  '        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" '
-                  f'android:value="{app_id}" />\n'
-              )
-              content = content.replace("</application>", metadata + "    </application>", 1)
           manifest.write_text(content)
           PY
 
@@ -112,7 +100,7 @@ jobs:
           }
           KOTLIN
 
-          # Recent AndroidX dependencies used by the feed require compileSdk 36.
+          # Recent AndroidX dependencies used by NightLink require compileSdk 36.
           python3 - "$BUILD_DIR/android/app/build.gradle.kts" <<'PY'
           import re
           import sys
@@ -135,7 +123,7 @@ jobs:
               raise SystemExit("Could not safely locate the generated app minSdk setting.")
 
           gradle_file.write_text(updated)
-          print("Android app compileSdk set to 36 and minSdk set to 24 for current Google Mobile Ads SDK.")
+          print("Android app compileSdk set to 36 and minSdk set to 24 (Android 7.0+ baseline).")
           PY
 
       - name: Resolve Flutter dependencies
@@ -143,7 +131,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          flutter pub add supabase_flutter livekit_client:^2.13.2 url_launcher image_picker video_player just_audio file_picker:10.3.3 share_plus:^10.1.4 google_mobile_ads:9.0.0
+          flutter pub add supabase_flutter livekit_client:^2.13.2 url_launcher image_picker video_player just_audio file_picker:10.3.3 share_plus:^10.1.4
           flutter pub get
 
       - name: Analyze Flutter source
@@ -170,16 +158,12 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://falimxmpicqaakjnigkv.supabase.co' }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          ADMOB_ANDROID_APP_ID: ${{ secrets.ADMOB_ANDROID_APP_ID }}
-          ADMOB_BANNER_AD_UNIT_ID: ${{ secrets.ADMOB_BANNER_AD_UNIT_ID }}
           NIGHTLINK_SUPPORT_EMAIL: ${{ secrets.NIGHTLINK_SUPPORT_EMAIL }}
         run: |
           set -euo pipefail
           flutter build apk --release -v \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY" \
-            --dart-define=ADMOB_ANDROID_APP_ID="$ADMOB_ANDROID_APP_ID" \
-            --dart-define=ADMOB_BANNER_AD_UNIT_ID="$ADMOB_BANNER_AD_UNIT_ID" \
             --dart-define=NIGHTLINK_SUPPORT_EMAIL="$NIGHTLINK_SUPPORT_EMAIL"
 
       - name: Install and launch APK on Android 15 emulator
