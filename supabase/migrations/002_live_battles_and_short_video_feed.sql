@@ -350,3 +350,53 @@ begin
   end if;
  end loop;
 end $$;
+
+
+-- Persistent profile likes are separate from the per-battle +2 score event.
+create table if not exists public.profile_likes (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references auth.users(id) on delete cascade,
+  viewer_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique(profile_id, viewer_id),
+  check(profile_id <> viewer_id)
+);
+alter table public.profile_likes enable row level security;
+drop policy if exists profile_likes_read_authenticated on public.profile_likes;
+create policy profile_likes_read_authenticated on public.profile_likes
+  for select to authenticated using(true);
+grant select on public.profile_likes to authenticated;
+
+create or replace function public.add_battle_like(p_match_id uuid, p_host_id uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_user uuid := auth.uid();
+  v_team integer;
+  v_battle_inserted integer;
+  v_profile_inserted integer;
+begin
+  if v_user is null then raise exception 'Authentication required'; end if;
+  if v_user = p_host_id then raise exception 'You cannot like your own battle profile'; end if;
+  if not exists(select 1 from public.matches where id=p_match_id and status='live'
+    and (battle_ends_at is null or battle_ends_at>now())) then raise exception 'Battle is not live'; end if;
+  select team_no into v_team from public.match_players
+    where match_id=p_match_id and user_id=p_host_id and state in ('joined','ready');
+  if not found then raise exception 'Host is not playing in this battle'; end if;
+  insert into public.profile_likes(profile_id,viewer_id)
+    values(p_host_id,v_user) on conflict(profile_id,viewer_id) do nothing;
+  get diagnostics v_profile_inserted = row_count;
+  insert into public.battle_likes(match_id,viewer_id,host_id,team_no)
+    values(p_match_id,v_user,p_host_id,v_team) on conflict(match_id,viewer_id,host_id) do nothing;
+  get diagnostics v_battle_inserted = row_count;
+  if v_battle_inserted=1 then
+    insert into public.battle_scores(match_id,team_no,score) values(p_match_id,v_team,2)
+    on conflict(match_id,team_no) do update
+      set score=public.battle_scores.score+2,updated_at=now();
+  end if;
+  return jsonb_build_object('added',v_battle_inserted=1,
+    'profile_like_added',v_profile_inserted=1,
+    'score_added',case when v_battle_inserted=1 then 2 else 0 end);
+end;
+$$;
+revoke all on function public.add_battle_like(uuid,uuid) from public,anon;
+grant execute on function public.add_battle_like(uuid,uuid) to authenticated;
