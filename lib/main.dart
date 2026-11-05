@@ -69,6 +69,9 @@ class NightLinkApp extends StatelessWidget {
           secondary: blue,
         ),
       ),
+      builder: (context, child) => IncomingCallOverlay(
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: const AgeScreen(),
     );
   }
@@ -395,122 +398,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  final _client = Supabase.instance.client;
-  RealtimeChannel? _inviteChannel;
-  Map<String, dynamic>? _incomingInvite;
-  String _callerName = 'NightLink member';
-  bool _responding = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadPendingInvite();
-    final userId = _client.auth.currentUser?.id;
-    if (userId != null) {
-      _inviteChannel = _client
-          .channel('incoming-call-invitations-$userId')
-          .onPostgresChanges(
-            event: PostgresChangeEvent.insert,
-            schema: 'public',
-            table: 'call_invitations',
-            filter: PostgresChangeFilter(
-              type: PostgresChangeFilterType.eq,
-              column: 'receiver_id',
-              value: userId,
-            ),
-            callback: (_) => _loadPendingInvite(),
-          )
-          .subscribe();
-    }
-  }
-
-  Future<void> _loadPendingInvite() async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) return;
-    try {
-      final invite = await _client
-          .from('call_invitations')
-          .select('id, caller_id, call_mode, room_name, expires_at')
-          .eq('receiver_id', userId)
-          .eq('status', 'pending')
-          .gt('expires_at', DateTime.now().toUtc().toIso8601String())
-          .order('created_at')
-          .limit(1)
-          .maybeSingle();
-      if (!mounted) return;
-      if (invite == null) {
-        setState(() => _incomingInvite = null);
-        return;
-      }
-      var displayName = 'NightLink member';
-      try {
-        final profile = await _client
-            .from('profiles')
-            .select('display_name, username')
-            .eq('id', invite['caller_id'])
-            .maybeSingle();
-        displayName = (profile?['display_name'] ?? profile?['username'] ?? displayName).toString();
-      } catch (_) {}
-      if (!mounted) return;
-      setState(() {
-        _incomingInvite = Map<String, dynamic>.from(invite);
-        _callerName = displayName;
-      });
-    } catch (_) {
-      // Keep the home screen usable if realtime or the invitation query is unavailable.
-    }
-  }
-
-  Future<void> _respondToInvite(bool accept) async {
-    final invite = _incomingInvite;
-    if (invite == null || _responding) return;
-    setState(() => _responding = true);
-    try {
-      final status = accept ? 'accepted' : 'declined';
-      await _client
-          .from('call_invitations')
-          .update({'status': status})
-          .eq('id', invite['id'])
-          .eq('status', 'pending');
-      if (!mounted) return;
-      setState(() => _incomingInvite = null);
-      if (accept) {
-        final mode = invite['call_mode'] == 'video'
-            ? NightLinkCallMode.video
-            : NightLinkCallMode.voice;
-        await Navigator.push(context, MaterialPageRoute(
-          builder: (_) => LiveCallScreen(
-            mode: mode,
-            otherName: _callerName,
-            roomName: invite['room_name'].toString(),
-          ),
-        ));
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not respond to invitation: $error')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _responding = false);
-    }
-  }
-
-  @override
-  void dispose() {
-    final channel = _inviteChannel;
-    if (channel != null) _client.removeChannel(channel);
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -529,7 +418,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: Stack(\n        children: [\n          ListView(
+      body: ListView(
         padding: const EdgeInsets.all(22),
         children: [
           const SizedBox(height: 18),
@@ -576,85 +465,6 @@ class _HomeScreenState extends State<HomeScreen> {
             color: blue,
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MatchLobby())),
           ),
-          ],
-          ),
-          if (_incomingInvite != null)
-            Positioned(
-              top: 10,
-              left: 12,
-              right: 12,
-              child: Material(
-                color: const Color(0xFF182642),
-                elevation: 14,
-                borderRadius: BorderRadius.circular(18),
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            _incomingInvite!['call_mode'] == 'video'
-                                ? Icons.videocam
-                                : Icons.call,
-                            color: gold,
-                            size: 28,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              _incomingInvite!['call_mode'] == 'video'
-                                  ? 'INCOMING VIDEO CALL'
-                                  : 'INCOMING VOICE CALL',
-                              style: const TextStyle(
-                                color: gold,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: .6,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        '$_callerName is inviting you to a ${_incomingInvite!['call_mode']} call.',
-                        style: const TextStyle(color: Colors.white, fontSize: 15),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _responding ? null : () => _respondToInvite(false),
-                              icon: const Icon(Icons.call_end),
-                              label: const Text('DECLINE'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.redAccent,
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _responding ? null : () => _respondToInvite(true),
-                              icon: const Icon(Icons.call),
-                              label: const Text('ACCEPT'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: gold,
-                                foregroundColor: dark,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );
