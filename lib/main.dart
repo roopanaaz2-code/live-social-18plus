@@ -24,7 +24,10 @@ const supabaseKey = String.fromEnvironment(
 const gold = Color(0xFFFFC857);
 const blue = Color(0xFF2589FF);
 const dark = Color(0xFF090D18);
-const supportEmail = 'roopanaaz2@gmail.com';
+const supportEmail = String.fromEnvironment(
+  'NIGHTLINK_SUPPORT_EMAIL',
+  defaultValue: 'roopanaaz2@gmail.com',
+);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -587,7 +590,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _HomeActionCard(
             icon: Icons.support_agent,
             title: 'CONTACT US',
-            subtitle: 'roopanaaz2@gmail.com • Get help from NightLink support',
+            subtitle: 'Send a private message to NightLink support',
             color: blue,
             onTap: _contactUs,
           ),
