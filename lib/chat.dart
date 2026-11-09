@@ -45,7 +45,6 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _people = List<Map<String, dynamic>>.from(rows);
         _loading = false;
-        _loadingMessages = false;
         _error = null;
       });
     } catch (_) {
@@ -161,6 +160,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       setState(() {
         _messages = List<Map<String, dynamic>>.from(rows);
         _loading = false;
+        _loadingMessages = false;
         _error = null;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
