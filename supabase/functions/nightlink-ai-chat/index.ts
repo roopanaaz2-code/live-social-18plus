@@ -48,9 +48,9 @@ Deno.serve(async (req: Request) => {
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) return json({ error: "Your session has expired. Please sign in again." }, 401);
 
-    const apiKey = Deno.env.get("GEMINI_API_KEY");
+    const apiKey = Deno.env.get("GROQ_API_KEY");
     if (!apiKey) {
-      return json({ error: "NightLink AI is waiting for its free Gemini API key to be configured by the app owner." }, 503);
+      return json({ error: "NightLink AI needs its free Groq API key. The app owner must add GROQ_API_KEY in Supabase Edge Function secrets." }, 503);
     }
 
     let body: { messages?: unknown };
@@ -59,45 +59,46 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Send between 1 and 12 recent chat messages." }, 400);
     }
 
-    const contents = body.messages.map((item: unknown) => {
+    const messages = body.messages.map((item: unknown) => {
       if (!item || typeof item !== "object") throw new Error("Invalid message.");
       const message = item as { role?: unknown; content?: unknown };
-      const role = message.role === "assistant" ? "model" : message.role === "user" ? "user" : null;
+      const role = message.role === "assistant" ? "assistant" : message.role === "user" ? "user" : null;
       if (!role || typeof message.content !== "string") throw new Error("Invalid message format.");
-      const text = message.content.trim();
-      if (!text || text.length > 4000) throw new Error("Each message must contain 1 to 4000 characters.");
-      return { role, parts: [{ text }] };
+      const content = message.content.trim();
+      if (!content || content.length > 4000) throw new Error("Each message must contain 1 to 4000 characters.");
+      return { role, content };
     });
 
-    if (contents[contents.length - 1].role !== "user") {
+    if (messages[messages.length - 1].role !== "user") {
       return json({ error: "The latest message must be from you." }, 400);
     }
 
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemInstruction }] },
-          contents,
-          generationConfig: { temperature: 0.7, maxOutputTokens: 1200 },
-        }),
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
       },
-    );
+      body: JSON.stringify({
+        model: "openai/gpt-oss-20b",
+        messages: [
+          { role: "system", content: systemInstruction },
+          ...messages,
+        ],
+        max_completion_tokens: 1200,
+      }),
+    });
 
     const result = await response.json();
     if (!response.ok) {
-      console.error("Gemini request failed", response.status, JSON.stringify(result).slice(0, 1200));
-      if (response.status === 429) return json({ error: "The free AI request limit has been reached. Please wait a little and try again." }, 429);
-      if (response.status === 403 || response.status === 400) return json({ error: "The AI provider rejected the request. Please check the Gemini API key and enabled model." }, 502);
+      console.error("Groq request failed", response.status, JSON.stringify(result).slice(0, 1200));
+      if (response.status === 429) return json({ error: "NightLink AI has reached Groq's free usage limit. Please wait and try again later." }, 429);
+      if (response.status === 401 || response.status === 403) return json({ error: "The Groq API key was rejected. Please check the GROQ_API_KEY secret in Supabase." }, 502);
+      if (response.status === 400) return json({ error: "Groq could not process this request. Please try a shorter message." }, 502);
       return json({ error: "The AI service is temporarily unavailable. Please try again shortly." }, 502);
     }
 
-    const reply = result?.candidates?.[0]?.content?.parts
-      ?.map((part: { text?: string }) => part.text ?? "")
-      .join("")
-      .trim();
+    const reply = result?.choices?.[0]?.message?.content?.trim();
     if (!reply) return json({ error: "The AI did not return a response. Please try again." }, 502);
     return json({ reply });
   } catch (error) {
