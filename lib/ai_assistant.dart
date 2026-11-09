@@ -79,6 +79,10 @@ class _NightLinkAiScreenState extends State<NightLinkAiScreen> {
         setState(() => _input.text = result.recognizedWords);
         if (result.finalResult) {
           setState(() => _listening = false);
+          // Voice mode submits the recognized sentence automatically.
+          Future.delayed(const Duration(milliseconds: 450), () {
+            if (mounted && _input.text.trim().isNotEmpty && !_sending) _send();
+          });
         }
       },
       listenFor: const Duration(seconds: 30),
