@@ -203,3 +203,40 @@ jobs:
           path: ${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
+
+  android-smoke-test:
+    name: Install and launch APK on Android 15 emulator
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout smoke-test script
+        uses: actions/checkout@v4
+
+      - name: Install emulator runtime libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends libpulse0
+
+      - name: Set up Android SDK tools
+        uses: android-actions/setup-android@v4
+
+      - name: Download verified APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: NightLink-Android-APK
+          path: ${{ runner.temp }}/nightlink-artifact
+
+      - name: Install and launch on Android 15
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          disable-animations: true
+          script: bash .github/scripts/android-smoke-test.sh "${{ runner.temp }}/nightlink-artifact/app-release.apk"
