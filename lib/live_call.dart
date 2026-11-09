@@ -191,6 +191,7 @@ class _IncomingCallOverlayState extends State<IncomingCallOverlay> {
   RealtimeChannel? _channel;
   StreamSubscription<AuthState>? _authSubscription;
   String? _subscribedUserId;
+  Timer? _pendingPoll;
   Map<String, dynamic>? _invite;
   String _callerName = 'NightLink member';
   bool _busy = false;
@@ -209,6 +210,8 @@ class _IncomingCallOverlayState extends State<IncomingCallOverlay> {
     if (userId == _subscribedUserId) return;
     final previous = _channel;
     _channel = null;
+    _pendingPoll?.cancel();
+    _pendingPoll = null;
     _subscribedUserId = userId;
     if (previous != null) _client.removeChannel(previous);
     if (userId == null) {
@@ -216,6 +219,10 @@ class _IncomingCallOverlayState extends State<IncomingCallOverlay> {
       return;
     }
     _loadPending();
+    // Keep incoming call alerts working when a device suspends Realtime.
+    _pendingPoll = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) _loadPending();
+    });
     _channel = _client
         .channel('global-incoming-calls-$userId')
         .onPostgresChanges(
@@ -306,6 +313,7 @@ class _IncomingCallOverlayState extends State<IncomingCallOverlay> {
   void dispose() {
     final channel = _channel;
     if (channel != null) _client.removeChannel(channel);
+    _pendingPoll?.cancel();
     _authSubscription?.cancel();
     super.dispose();
   }
@@ -385,6 +393,8 @@ class OutgoingCallScreen extends StatefulWidget {
 class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
   final _client = Supabase.instance.client;
   RealtimeChannel? _channel;
+  Timer? _statusPoll;
+  bool _checkingStatus = false;
   String _status = 'Calling... waiting for the member to accept';
   bool _opening = false;
 
@@ -428,13 +438,19 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
         )
         .subscribe();
     _checkCurrentStatus();
+    // Realtime can be delayed when Android suspends the app or changes networks.
+    _statusPoll = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted && !_opening) _checkCurrentStatus();
+    });
   }
 
   Future<void> _checkCurrentStatus() async {
+    if (_checkingStatus || _opening) return;
+    _checkingStatus = true;
     try {
       final row = await _client
           .from('call_invitations')
-          .select('status')
+          .select('status, expires_at')
           .eq('id', widget.invitationId)
           .maybeSingle();
       final status = row?['status']?.toString();
@@ -448,9 +464,22 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
           ),
         ));
       } else if (status == 'declined' && mounted) {
+        _statusPoll?.cancel();
         setState(() => _status = '${widget.otherName} declined the call.');
+      } else if (status == 'cancelled' && mounted) {
+        _statusPoll?.cancel();
+        setState(() => _status = 'The invitation was cancelled.');
+      } else if (row?['expires_at'] != null &&
+          DateTime.tryParse(row!['expires_at'].toString())?.isBefore(DateTime.now().toUtc()) == true &&
+          mounted) {
+        _statusPoll?.cancel();
+        setState(() => _status = 'The invitation expired. Please call again.');
       }
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('NightLink outgoing call status check failed: $error');
+    } finally {
+      _checkingStatus = false;
+    }
   }
 
   Future<void> _cancel() async {
@@ -460,11 +489,13 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
           .eq('id', widget.invitationId)
           .eq('status', 'pending');
     } catch (_) {}
+    _statusPoll?.cancel();
     if (mounted) Navigator.pop(context);
   }
 
   @override
   void dispose() {
+    _statusPoll?.cancel();
     final channel = _channel;
     if (channel != null) {
       _client.removeChannel(channel);
@@ -541,6 +572,7 @@ class _LiveCallScreenState extends State<LiveCallScreen> {
   }
 
   Future<void> _connect() async {
+    Room? connectingRoom;
     try {
       final response = await Supabase.instance.client.functions.invoke(
         'generate-livekit-token',
@@ -560,6 +592,7 @@ class _LiveCallScreenState extends State<LiveCallScreen> {
       }
 
       final room = Room();
+      connectingRoom = room;
       _room = room;
       room.addListener(_onRoomChanged);
 
@@ -578,11 +611,15 @@ class _LiveCallScreenState extends State<LiveCallScreen> {
             typingNoiseDetection: true,
           ),
         ),
-      );
+      ).timeout(const Duration(seconds: 35));
 
-      // Voice calls use the earpiece by default to reduce speaker-to-microphone echo.
-      // Video calls use the speaker so both participants are easier to hear.
-      await AudioManager.instance.setSpeakerOutputPreferred(_isVideo);
+      // Audio routing differs across Android vendors. A routing API failure
+      // must not tear down an otherwise valid LiveKit room.
+      try {
+        await AudioManager.instance.setSpeakerOutputPreferred(_isVideo);
+      } catch (routeError) {
+        debugPrint('NightLink audio route preference unavailable: $routeError');
+      }
       await room.localParticipant?.setMicrophoneEnabled(true);
       if (_isVideo) {
         await room.localParticipant?.setCameraEnabled(true);
@@ -596,8 +633,16 @@ class _LiveCallScreenState extends State<LiveCallScreen> {
         _cameraEnabled = _isVideo;
       });
     } catch (error) {
+      debugPrint('NightLink private call connection failed: $error');
+      final room = connectingRoom;
+      if (room != null) {
+        room.removeListener(_onRoomChanged);
+        try { await room.disconnect(); } catch (_) {}
+        try { await room.dispose(); } catch (_) {}
+      }
       if (!mounted) return;
       setState(() {
+        _room = null;
         _connecting = false;
         _connected = false;
         _error = error.toString().replaceFirst('Exception: ', '');
