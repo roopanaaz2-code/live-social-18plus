@@ -32,7 +32,7 @@ Deno.serve(async (req: Request) => {
     if (publishableKeysRaw) {
       try {
         const keys = JSON.parse(publishableKeysRaw);
-        publishableKey = keys.default ?? legacyAnonKey;
+        publishableKey = keys.default ?? legacyAnonKey ?? publishableKey;
       } catch {
         console.error("SUPABASE_PUBLISHABLE_KEYS is not valid JSON");
       }
