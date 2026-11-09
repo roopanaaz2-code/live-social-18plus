@@ -93,6 +93,7 @@ jobs:
                   1,
               )
           queries = """    <queries>
+                  <package android:name="com.google.android.gm" />
                   <intent><action android:name="android.speech.RecognitionService" /></intent>
                   <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
               </queries>
