@@ -29,8 +29,8 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const publishableKeysRaw = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS");
     const publishableKey =
-      Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ??
-      Deno.env.get("SUPABASE_ANON_KEY") ??
+      Deno.env.get("SUPABASE_PUBLISHABLE_KEY")?.trim() ||
+      Deno.env.get("SUPABASE_ANON_KEY") ||
       (() => {
         if (!publishableKeysRaw) return null;
         try { return JSON.parse(publishableKeysRaw).default ?? null; } catch { return null; }
