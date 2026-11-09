@@ -53,16 +53,16 @@ The developer account has lifetime VIP access. Paid VIP checkout for other membe
 
 Set the GitHub Actions secret `NIGHTLINK_SUPPORT_EMAIL` to the support inbox address. The Contact Us button opens a pre-addressed email without displaying the recipient in the app UI. The compiled APK still contains the recipient needed by the mail app; a truly hidden recipient requires a server-side support form and email provider.
 
-
-## NightLink AI setup (free-tier option)
+## NightLink AI setup (free Groq tier)
 
 The Android client calls the authenticated Supabase Edge Function `nightlink-ai-chat`; it does not contain a provider API key.
 
-1. Create a Gemini API key in Google AI Studio: https://aistudio.google.com/apikey
-2. In the Supabase project, add the Edge Function secret `GEMINI_API_KEY` with that key. Never add it to Flutter source, GitHub commits, or a public build variable.
+1. Create a free Groq account at https://console.groq.com/ and create an API key at https://console.groq.com/keys. Stay on Groq's Free plan; do not upgrade to the paid Developer plan.
+2. In the Supabase project, add the Edge Function secret `GROQ_API_KEY` with that key. Never add it to Flutter source, GitHub commits, or a public build variable.
 3. Deploy `supabase/functions/nightlink-ai-chat/index.ts` as the `nightlink-ai-chat` Edge Function with JWT verification enabled.
-4. The app uses the device speech-recognition service for microphone input and Android system text-to-speech for spoken replies. Availability and supported languages depend on the device's installed speech services.
+4. The function uses Groq's OpenAI-compatible Chat Completions API with model `openai/gpt-oss-20b`.
+5. The app uses the device speech-recognition service for microphone input and Android system text-to-speech for spoken replies. Availability and supported languages depend on the device's installed speech services.
 
-Gemini's free tier has changing rate limits and availability. It is not unlimited or guaranteed to remain free. Google currently states that content on the free tier may be used to improve its products; do not send passwords, private messages, or sensitive personal information to the AI.
+Groq's Free plan has organization-level rate limits. When a limit is reached, requests are rejected until the limit resets; this integration does not automatically switch to paid billing. Limits and model availability can change. Do not send passwords, private messages, or sensitive personal information to the AI provider.
 
 The Contact Us action first tries to open the Gmail app addressed to `roopanaaz2@gmail.com`; if Gmail is unavailable, it falls back to Android's registered `mailto:` handler.
