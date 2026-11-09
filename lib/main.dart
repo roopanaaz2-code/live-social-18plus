@@ -12,6 +12,7 @@ import 'chat.dart';
 import 'live_call.dart';
 import 'wallet.dart';
 import 'feed.dart';
+import 'ai_assistant.dart';
 
 const supabaseUrl = String.fromEnvironment(
   'SUPABASE_URL',
@@ -24,10 +25,7 @@ const supabaseKey = String.fromEnvironment(
 const gold = Color(0xFFFFC857);
 const blue = Color(0xFF2589FF);
 const dark = Color(0xFF090D18);
-const supportEmail = String.fromEnvironment(
-  'NIGHTLINK_SUPPORT_EMAIL',
-  defaultValue: 'roopanaaz2@gmail.com',
-);
+const supportEmail = 'roopanaaz2@gmail.com';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -537,6 +535,14 @@ class _HomeScreenState extends State<HomeScreen> {
             subtitle: 'Watch, upload and share short videos',
             color: gold,
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NightLinkFeedScreen())),
+          ),
+          const SizedBox(height: 12),
+          _HomeActionCard(
+            icon: Icons.auto_awesome,
+            title: 'NIGHTLINK AI',
+            subtitle: 'Ask questions, get smart help and talk by microphone',
+            color: blue,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NightLinkAiScreen())),
           ),
           const SizedBox(height: 12),
           _HomeActionCard(
