@@ -477,12 +477,32 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       return;
     }
-    final uri = Uri(
+    // Prefer the Gmail app when installed, then fall back to the Android
+    // default mail handler so Contact Us still works without Gmail.
+    final gmailUri = Uri(
+      scheme: 'googlegmail',
+      host: 'co',
+      queryParameters: {
+        'to': supportEmail,
+        'subject': 'NightLink Support',
+      },
+    );
+    final mailtoUri = Uri(
       scheme: 'mailto',
-      path: supportEmail.trim(),
+      path: supportEmail,
       queryParameters: {'subject': 'NightLink Support'},
     );
-    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    var opened = false;
+    try {
+      if (await canLaunchUrl(gmailUri)) {
+        opened = await launchUrl(gmailUri, mode: LaunchMode.externalApplication);
+      }
+      if (!opened) {
+        opened = await launchUrl(mailtoUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (error) {
+      debugPrint('NightLink Contact Us launch failed: $error');
+    }
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No email app is available on this device.')),
