@@ -279,11 +279,16 @@ class _IncomingCallOverlayState extends State<IncomingCallOverlay> {
     if (invite == null || _busy) return;
     setState(() => _busy = true);
     try {
-      await _client
+      final updated = await _client
           .from('call_invitations')
           .update({'status': accept ? 'accepted' : 'declined'})
           .eq('id', invite['id'])
-          .eq('status', 'pending');
+          .eq('status', 'pending')
+          .select('id, status')
+          .maybeSingle();
+      if (updated == null || updated['status'] != (accept ? 'accepted' : 'declined')) {
+        throw Exception('This invitation is no longer available. Ask the caller to try again.');
+      }
       if (!mounted) return;
       setState(() => _invite = null);
       if (accept) {
