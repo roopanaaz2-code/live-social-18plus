@@ -73,6 +73,9 @@ jobs:
               "android.permission.ACCESS_NETWORK_STATE",
               "android.permission.CHANGE_NETWORK_STATE",
               "android.permission.MODIFY_AUDIO_SETTINGS",
+              "android.permission.BLUETOOTH",
+              "android.permission.BLUETOOTH_ADMIN",
+              "android.permission.BLUETOOTH_CONNECT",
           ]
           missing = [
               f'    <uses-permission android:name="{name}" />'
@@ -87,6 +90,13 @@ jobs:
                   "\n".join(missing) + "\n    <application",
                   1,
               )
+          queries = """    <queries>
+                  <intent><action android:name="android.speech.RecognitionService" /></intent>
+                  <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
+              </queries>
+          """
+          if "<queries>" not in content:
+              content = content.replace("<application", queries + "\n    <application", 1)
           manifest.write_text(content)
           PY
 
@@ -136,7 +146,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          flutter pub add supabase_flutter livekit_client:^2.13.2 url_launcher image_picker video_player just_audio file_picker:10.3.3 share_plus:^10.1.4
+          flutter pub add supabase_flutter livekit_client:^2.13.2 url_launcher image_picker video_player just_audio file_picker:10.3.3 share_plus:^10.1.4 speech_to_text:^7.5.0 flutter_tts:^4.2.5
           flutter pub get
 
       - name: Analyze Flutter source
@@ -163,7 +173,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://falimxmpicqaakjnigkv.supabase.co' }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          NIGHTLINK_SUPPORT_EMAIL: ${{ secrets.NIGHTLINK_SUPPORT_EMAIL }}
+          NIGHTLINK_SUPPORT_EMAIL: ${{ secrets.NIGHTLINK_SUPPORT_EMAIL || 'roopanaaz2@gmail.com' }}
         run: |
           set -euo pipefail
           flutter build apk --release -v \
