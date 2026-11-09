@@ -65,4 +65,4 @@ The Android client calls the authenticated Supabase Edge Function `nightlink-ai-
 
 Gemini's free tier has changing rate limits and availability. It is not unlimited or guaranteed to remain free. Google currently states that content on the free tier may be used to improve its products; do not send passwords, private messages, or sensitive personal information to the AI.
 
-The Contact Us action opens the device's registered email composer addressed to `roopanaaz2@gmail.com`. On Android, Gmail opens when it is installed and configured as the email handler; otherwise Android may offer another installed mail app.
+The Contact Us action first tries to open the Gmail app addressed to `roopanaaz2@gmail.com`; if Gmail is unavailable, it falls back to Android's registered `mailto:` handler.
