@@ -190,3 +190,14 @@ jobs:
           path: ${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Run Android API 35 launch smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: |
+            bash "$GITHUB_WORKSPACE/.github/scripts/android-smoke-test.sh" \
+              "$RUNNER_TEMP/nightlink/build/app/outputs/flutter-apk/app-release.apk"
