@@ -5,6 +5,7 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'connections.dart';
+import 'nightlink_design.dart';
 
 const _gold = Color(0xFFFFC857);
 const _blue = Color(0xFF2589FF);
@@ -79,11 +80,10 @@ class _CallContactsScreenState extends State<CallContactsScreen> {
   Widget build(BuildContext context) {
     final isVideo = widget.mode == NightLinkCallMode.video;
     return Scaffold(
-      backgroundColor: _dark,
+      backgroundColor: NightLinkDesign.background,
       appBar: AppBar(
-        backgroundColor: _dark,
-        title: Text(isVideo ? 'VIDEO CHAT' : 'VOICE CHAT',
-            style: const TextStyle(color: _gold, fontWeight: FontWeight.bold)),
+        backgroundColor: NightLinkDesign.background,
+        title: Text(isVideo ? 'Video calls' : 'Voice calls'),
         actions: [
           IconButton(
             tooltip: 'Find members',
@@ -91,85 +91,151 @@ class _CallContactsScreenState extends State<CallContactsScreen> {
               await Navigator.push(context, MaterialPageRoute(builder: (_) => const ConnectionsScreen()));
               _loadPeople();
             },
-            icon: const Icon(Icons.person_search, color: _gold),
+            icon: const Icon(Icons.person_search_rounded),
           ),
           IconButton(
             onPressed: _loadPeople,
-            icon: const Icon(Icons.refresh, color: _blue),
+            tooltip: 'Refresh contacts',
+            icon: const Icon(Icons.refresh_rounded),
           ),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: _gold))
+          ? const Center(child: CircularProgressIndicator(color: NightLinkDesign.gold))
           : _error != null
               ? Center(
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Text(_error!, style: const TextStyle(color: Colors.white70)),
-                    ElevatedButton(onPressed: _loadPeople, child: const Text('RETRY')),
-                  ]),
+                  child: NightLinkPanel(
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.wifi_off_rounded, color: NightLinkDesign.error, size: 36),
+                      const SizedBox(height: 12),
+                      Text(_error!, textAlign: TextAlign.center,
+                          style: const TextStyle(color: NightLinkDesign.textMuted)),
+                      const SizedBox(height: 14),
+                      ElevatedButton.icon(onPressed: _loadPeople,
+                          icon: const Icon(Icons.refresh_rounded), label: const Text('Try again')),
+                    ]),
+                  ),
                 )
               : _people.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Padding(
-                        padding: EdgeInsets.all(26),
-                        child: Text(
-                          'No accepted connections yet. Use the people-search icon above to find a member and send a connection request.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.white70, height: 1.5),
+                        padding: const EdgeInsets.all(26),
+                        child: NightLinkPanel(
+                          accent: NightLinkDesign.gold,
+                          child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(Icons.people_alt_outlined, size: 42, color: NightLinkDesign.gold),
+                            const SizedBox(height: 14),
+                            const Text('Your circle starts here',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'No accepted connections yet. Use people search to find a member and send a connection request.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: NightLinkDesign.textMuted, height: 1.5),
+                            ),
+                            const SizedBox(height: 16),
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                await Navigator.push(context, MaterialPageRoute(builder: (_) => const ConnectionsScreen()));
+                                _loadPeople();
+                              },
+                              icon: const Icon(Icons.person_search_rounded),
+                              label: const Text('Find people'),
+                            ),
+                          ]),
                         ),
                       ),
                     )
                   : ListView(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
                       children: [
-                        const Text(
-                          'Choose a member to join a private live room.',
-                          style: TextStyle(color: Colors.white70),
+                        NightLinkPanel(
+                          accent: isVideo ? NightLinkDesign.blue : NightLinkDesign.gold,
+                          gradient: true,
+                          padding: const EdgeInsets.all(20),
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            NightLinkDesign.eyebrow(isVideo ? 'Face to face' : 'Stay connected',
+                                color: isVideo ? NightLinkDesign.blue : NightLinkDesign.gold),
+                            const SizedBox(height: 9),
+                            Text(isVideo ? 'Make it a video moment' : 'Start with a voice call',
+                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 7),
+                            const Text('Choose a connection to send a private call invitation.',
+                                style: TextStyle(color: NightLinkDesign.textMuted, height: 1.4)),
+                          ]),
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Tap CALL to send an invitation. The other member will see Accept or Decline inside NightLink.',
-                          style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.4),
-                        ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 22),
+                        Row(children: [
+                          const Expanded(child: Text('YOUR CONNECTIONS',
+                              style: TextStyle(color: NightLinkDesign.textMuted, fontSize: 11,
+                                  fontWeight: FontWeight.w700, letterSpacing: 1.2))),
+                          Text('${_people.length} members',
+                              style: const TextStyle(color: NightLinkDesign.textMuted, fontSize: 12)),
+                        ]),
+                        const SizedBox(height: 10),
                         for (final person in _people)
-                          Card(
-                            color: const Color(0xFF11182B),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: const Color(0x332589FF),
-                                child: Icon(isVideo ? Icons.videocam : Icons.mic, color: _blue),
-                              ),
-                              title: Text(
-                                (person['display_name'] ?? person['username'] ?? 'NightLink member').toString(),
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              subtitle: const Text('Send a live call invitation', style: TextStyle(color: Colors.white54)),
-                              trailing: const Icon(Icons.call, size: 22, color: _gold),
-                              onTap: () async {
-                                final name = (person['display_name'] ?? person['username'] ?? 'Member').toString();
-                                try {
-                                  final invitation = await _client.from('call_invitations').insert({
-                                    'caller_id': _client.auth.currentUser!.id,
-                                    'receiver_id': person['id'].toString(),
-                                    'call_mode': widget.mode == NightLinkCallMode.voice ? 'voice' : 'video',
-                                    'room_name': _roomName(person['id'].toString()),
-                                  }).select('id').single();
-                                  if (!mounted) return;
-                                  Navigator.push(context, MaterialPageRoute(
-                                    builder: (_) => OutgoingCallScreen(
-                                      invitationId: invitation['id'].toString(),
-                                      mode: widget.mode,
-                                      otherName: name,
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(NightLinkDesign.radius),
+                                onTap: () async {
+                                  final name = (person['display_name'] ?? person['username'] ?? 'Member').toString();
+                                  try {
+                                    final invitation = await _client.from('call_invitations').insert({
+                                      'caller_id': _client.auth.currentUser!.id,
+                                      'receiver_id': person['id'].toString(),
+                                      'call_mode': widget.mode == NightLinkCallMode.voice ? 'voice' : 'video',
+                                      'room_name': _roomName(person['id'].toString()),
+                                    }).select('id').single();
+                                    if (!mounted) return;
+                                    Navigator.push(context, MaterialPageRoute(
+                                      builder: (_) => OutgoingCallScreen(
+                                        invitationId: invitation['id'].toString(),
+                                        mode: widget.mode,
+                                        otherName: name,
+                                      ),
+                                    ));
+                                  } catch (error) {
+                                    if (!mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Could not send invitation: $error')),
+                                    );
+                                  }
+                                },
+                                child: Ink(
+                                  padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
+                                  decoration: NightLinkDesign.surfaceDecoration(accent: isVideo
+                                      ? NightLinkDesign.blue : NightLinkDesign.gold, radius: 20),
+                                  child: Row(children: [
+                                    NightLinkDesign.avatar(
+                                      name: (person['display_name'] ?? person['username'] ?? 'NightLink member').toString(),
+                                      radius: 25,
+                                      accent: isVideo ? NightLinkDesign.blue : NightLinkDesign.gold,
                                     ),
-                                  ));
-                                } catch (error) {
-                                  if (!mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Could not send invitation: $error')),
-                                  );
-                                }
-                              },
+                                    const SizedBox(width: 13),
+                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                      Text((person['display_name'] ?? person['username'] ?? 'NightLink member').toString(),
+                                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                                      const SizedBox(height: 4),
+                                      const Text('Available to connect',
+                                          style: TextStyle(color: NightLinkDesign.textMuted, fontSize: 12)),
+                                    ])),
+                                    const SizedBox(width: 10),
+                                    Container(
+                                      width: 44, height: 44,
+                                      decoration: BoxDecoration(
+                                        color: (isVideo ? NightLinkDesign.blue : NightLinkDesign.gold).withOpacity(.16),
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                      child: Icon(isVideo ? Icons.videocam_rounded : Icons.call_rounded,
+                                          color: isVideo ? NightLinkDesign.blue : NightLinkDesign.gold),
+                                    ),
+                                  ]),
+                                ),
+                              ),
                             ),
                           ),
                       ],
@@ -333,41 +399,51 @@ class _IncomingCallOverlayState extends State<IncomingCallOverlay> {
           left: 12,
           right: 12,
           child: Material(
-            color: const Color(0xFF182642),
-            elevation: 18,
-            borderRadius: BorderRadius.circular(18),
-            child: Padding(
-              padding: const EdgeInsets.all(18),
+            color: Colors.transparent,
+            elevation: 12,
+            borderRadius: BorderRadius.circular(NightLinkDesign.radius),
+            child: NightLinkPanel(
+              accent: NightLinkDesign.gold,
+              gradient: true,
+              padding: const EdgeInsets.all(20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
-                    Icon(_invite!['call_mode'] == 'video' ? Icons.videocam : Icons.call,
-                        color: _gold, size: 28),
+                    Container(
+                      width: 44, height: 44,
+                      decoration: BoxDecoration(color: _gold.withOpacity(.15), borderRadius: BorderRadius.circular(14)),
+                      child: Icon(_invite!['call_mode'] == 'video' ? Icons.videocam_rounded : Icons.call_rounded,
+                          color: _gold, size: 24),
+                    ),
                     const SizedBox(width: 10),
                     Expanded(child: Text(
                       _invite!['call_mode'] == 'video' ? 'INCOMING VIDEO CALL' : 'INCOMING VOICE CALL',
-                      style: const TextStyle(color: _gold, fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: _gold, fontWeight: FontWeight.w800, letterSpacing: .8),
                     )),
                   ]),
                   const SizedBox(height: 10),
-                  Text('$_callerName is calling you.',
-                      style: const TextStyle(color: Colors.white, fontSize: 15)),
+                  Row(children: [
+                    NightLinkDesign.avatar(name: _callerName, radius: 23, accent: NightLinkDesign.gold),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text('$_callerName is calling you.',
+                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600))),
+                  ]),
                   const SizedBox(height: 16),
                   Row(children: [
                     Expanded(child: ElevatedButton.icon(
                       onPressed: _busy ? null : () => _respond(false),
                       icon: const Icon(Icons.call_end),
                       label: const Text('DECLINE'),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                      style: ElevatedButton.styleFrom(backgroundColor: NightLinkDesign.error, foregroundColor: Colors.white),
                     )),
                     const SizedBox(width: 12),
                     Expanded(child: ElevatedButton.icon(
                       onPressed: _busy ? null : () => _respond(true),
                       icon: const Icon(Icons.call),
                       label: const Text('ACCEPT'),
-                      style: ElevatedButton.styleFrom(backgroundColor: _gold, foregroundColor: _dark),
+                      style: ElevatedButton.styleFrom(backgroundColor: NightLinkDesign.success, foregroundColor: Colors.white),
                     )),
                   ]),
                 ],
@@ -510,34 +586,39 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: _dark,
+    backgroundColor: NightLinkDesign.background,
     appBar: AppBar(
-      backgroundColor: _dark,
-      title: Text(widget.mode == NightLinkCallMode.video ? 'VIDEO INVITATION' : 'VOICE INVITATION'),
-      leading: IconButton(onPressed: _cancel, icon: const Icon(Icons.close)),
+      backgroundColor: NightLinkDesign.background,
+      title: Text(widget.mode == NightLinkCallMode.video ? 'Video invitation' : 'Voice invitation'),
+      leading: IconButton(onPressed: _cancel, icon: const Icon(Icons.close_rounded)),
     ),
     body: Center(
       child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(widget.mode == NightLinkCallMode.video ? Icons.videocam : Icons.call,
-                color: _gold, size: 68),
+        padding: const EdgeInsets.all(24),
+        child: NightLinkPanel(
+          accent: NightLinkDesign.gold,
+          gradient: true,
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 34),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            NightLinkDesign.avatar(name: widget.otherName, radius: 52, accent: NightLinkDesign.gold),
             const SizedBox(height: 20),
-            Text('Calling ${widget.otherName}',
-                style: const TextStyle(color: _gold, fontSize: 23, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
+            NightLinkDesign.eyebrow('Private ${widget.mode == NightLinkCallMode.video ? 'video' : 'voice'} room', color: NightLinkDesign.gold),
+            const SizedBox(height: 8),
+            Text('Calling ${widget.otherName}', textAlign: TextAlign.center,
+                style: const TextStyle(color: NightLinkDesign.text, fontSize: 24, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 10),
             Text(_status, textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white70)),
+                style: const TextStyle(color: NightLinkDesign.textMuted, height: 1.45)),
+            const SizedBox(height: 26),
+            const CircularProgressIndicator(color: NightLinkDesign.gold, strokeWidth: 2.5),
             const SizedBox(height: 24),
-            ElevatedButton.icon(
+            SizedBox(width: double.infinity, child: ElevatedButton.icon(
               onPressed: _cancel,
-              icon: const Icon(Icons.call_end),
-              label: const Text('CANCEL INVITATION'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            ),
-          ],
+              icon: const Icon(Icons.call_end_rounded),
+              label: const Text('Cancel invitation'),
+              style: ElevatedButton.styleFrom(backgroundColor: NightLinkDesign.error, foregroundColor: Colors.white),
+            )),
+          ]),
         ),
       ),
     ),
@@ -724,17 +805,18 @@ class _LiveCallScreenState extends State<LiveCallScreen> {
     }
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF17233A),
+        gradient: const LinearGradient(colors: [Color(0xFF1B2D49), Color(0xFF101725)],
+            begin: Alignment.topLeft, end: Alignment.bottomRight),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.person, color: _blue, size: 54),
+            NightLinkDesign.avatar(name: label, radius: 36, accent: NightLinkDesign.blue),
             const SizedBox(height: 8),
-            Text(label, style: const TextStyle(color: Colors.white70)),
-            const Text('Camera off', style: TextStyle(color: Colors.white38, fontSize: 12)),
+            Text(label, style: const TextStyle(color: NightLinkDesign.text, fontWeight: FontWeight.w600)),
+            const Text('Camera off', style: TextStyle(color: NightLinkDesign.textMuted, fontSize: 12)),
           ],
         ),
       ),
@@ -753,124 +835,156 @@ class _LiveCallScreenState extends State<LiveCallScreen> {
         return false;
       },
       child: Scaffold(
-        backgroundColor: _dark,
+        backgroundColor: NightLinkDesign.background,
         appBar: AppBar(
-          backgroundColor: _dark,
-          title: Text(_isVideo ? 'VIDEO CALL' : 'VOICE CALL'),
-          leading: IconButton(onPressed: _leave, icon: const Icon(Icons.close)),
+          backgroundColor: NightLinkDesign.background,
+          title: Text(_isVideo ? 'Video call' : 'Voice call'),
+          leading: IconButton(onPressed: _leave, icon: const Icon(Icons.close_rounded)),
         ),
         body: _connecting
             ? const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(color: _gold),
-                    SizedBox(height: 18),
-                    Text('Connecting securely to LiveKit...', style: TextStyle(color: Colors.white70)),
-                  ],
-                ),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  CircularProgressIndicator(color: NightLinkDesign.gold),
+                  SizedBox(height: 18),
+                  Text('Connecting securely to LiveKit...', style: TextStyle(color: NightLinkDesign.textMuted)),
+                ]),
               )
             : _error != null
                 ? Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.error_outline, color: Colors.orangeAccent, size: 48),
+                      child: NightLinkPanel(
+                        accent: NightLinkDesign.error,
+                        child: Column(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.error_outline_rounded, color: NightLinkDesign.error, size: 48),
                           const SizedBox(height: 14),
-                          const Text('Could not start the call', style: TextStyle(color: _gold, fontSize: 18)),
+                          const Text('Could not start the call', style: TextStyle(color: NightLinkDesign.gold, fontSize: 18)),
                           const SizedBox(height: 10),
-                          Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
+                          Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: NightLinkDesign.textMuted)),
                           const SizedBox(height: 18),
-                          ElevatedButton(onPressed: _leave, child: const Text('CLOSE')),
-                        ],
+                          ElevatedButton(onPressed: _leave, child: const Text('Close')),
+                        ]),
                       ),
                     ),
                   )
-                : Column(
-                    children: [
-                      Expanded(
-                        child: _isVideo
-                            ? ListView(
-                                padding: const EdgeInsets.all(12),
-                                children: [
-                                  if (local != null)
-                                    SizedBox(
-                                      height: 260,
-                                      child: _videoTile(local, 'You'),
+                : Column(children: [
+                    Expanded(
+                      child: _isVideo
+                          ? Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(28),
+                                child: Stack(fit: StackFit.expand, children: [
+                                  if (remoteCount > 0)
+                                    _videoTile(room!.remoteParticipants.values.first, widget.otherName)
+                                  else if (local != null)
+                                    _videoTile(local, 'You')
+                                  else
+                                    Container(color: NightLinkDesign.surface),
+                                  Positioned(
+                                    top: 14, left: 14,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                                      decoration: BoxDecoration(color: Colors.black.withOpacity(.64),
+                                          borderRadius: BorderRadius.circular(30)),
+                                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                        Icon(Icons.circle, size: 8,
+                                            color: remoteCount > 0 ? NightLinkDesign.success : NightLinkDesign.gold),
+                                        const SizedBox(width: 7),
+                                        Text(remoteCount > 0 ? widget.otherName : 'Waiting for ${widget.otherName}',
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                      ]),
                                     ),
-                                  for (final participant in room!.remoteParticipants.values)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 12),
-                                      child: SizedBox(
-                                        height: 260,
-                                        child: _videoTile(participant, widget.otherName),
+                                  ),
+                                  if (local != null && remoteCount > 0)
+                                    Positioned(
+                                      right: 14, bottom: 14, width: 112, height: 154,
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(18),
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(border: Border.all(color: Colors.white24, width: 1.2)),
+                                          child: _videoTile(local, 'You'),
+                                        ),
                                       ),
                                     ),
                                   if (remoteCount == 0)
-                                    const Padding(
-                                      padding: EdgeInsets.all(18),
-                                      child: Text(
-                                        'You are in the room. Waiting for the other member to join...',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(color: Colors.white70),
+                                    Positioned(left: 18, right: 18, bottom: 22,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(color: Colors.black.withOpacity(.58),
+                                            borderRadius: BorderRadius.circular(16)),
+                                        child: const Text('You’re in the room. Your connection will appear here when they join.',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(color: Colors.white, fontSize: 12, height: 1.35)),
                                       ),
                                     ),
-                                ],
-                              )
-                            : Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const CircleAvatar(
-                                      radius: 48,
-                                      backgroundColor: Color(0x332589FF),
-                                      child: Icon(Icons.headset_mic, color: _blue, size: 44),
-                                    ),
+                                ]),
+                              ),
+                            )
+                          : Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(28),
+                                child: NightLinkPanel(
+                                  accent: NightLinkDesign.blue,
+                                  gradient: true,
+                                  padding: const EdgeInsets.symmetric(horizontal: 34, vertical: 38),
+                                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                                    NightLinkDesign.avatar(name: widget.otherName, radius: 58, accent: NightLinkDesign.blue),
+                                    const SizedBox(height: 20),
+                                    Text(widget.otherName, textAlign: TextAlign.center,
+                                        style: const TextStyle(color: NightLinkDesign.text, fontSize: 23, fontWeight: FontWeight.w800)),
+                                    const SizedBox(height: 9),
+                                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                      Icon(Icons.circle, size: 8,
+                                          color: remoteCount > 0 ? NightLinkDesign.success : NightLinkDesign.gold),
+                                      const SizedBox(width: 7),
+                                      Text(remoteCount > 0 ? 'Connected' : 'Waiting for them to join',
+                                          style: const TextStyle(color: NightLinkDesign.textMuted)),
+                                    ]),
                                     const SizedBox(height: 18),
-                                    Text(widget.otherName, style: const TextStyle(color: _gold, fontSize: 22)),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      remoteCount > 0 ? 'Member connected' : 'Waiting for the other member to join...',
-                                      style: const TextStyle(color: Colors.white70),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                                      decoration: BoxDecoration(color: Colors.white.withOpacity(.05),
+                                          borderRadius: BorderRadius.circular(30)),
+                                      child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                                        Icon(Icons.lock_outline_rounded, size: 15, color: NightLinkDesign.textMuted),
+                                        SizedBox(width: 7),
+                                        Text('Private voice room', style: TextStyle(color: NightLinkDesign.textMuted, fontSize: 12)),
+                                      ]),
                                     ),
-                                  ],
+                                  ]),
                                 ),
                               ),
-                      ),
-                      SafeArea(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 22),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _CallControl(
-                                icon: _micEnabled ? Icons.mic : Icons.mic_off,
-                                label: _micEnabled ? 'Mute' : 'Unmute',
-                                onTap: _toggleMic,
-                              ),
-                              if (_isVideo) ...[
-                                const SizedBox(width: 24),
-                                _CallControl(
-                                  icon: _cameraEnabled ? Icons.videocam : Icons.videocam_off,
-                                  label: _cameraEnabled ? 'Camera off' : 'Camera on',
-                                  onTap: _toggleCamera,
-                                ),
-                              ],
-                              const SizedBox(width: 24),
-                              _CallControl(
-                                icon: Icons.call_end,
-                                label: 'End',
-                                color: Colors.redAccent,
-                                onTap: _leave,
-                              ),
-                            ],
+                            ),
+                    ),
+                    SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          _CallControl(
+                            icon: _micEnabled ? Icons.mic_rounded : Icons.mic_off_rounded,
+                            label: _micEnabled ? 'Mute' : 'Unmute',
+                            onTap: _toggleMic,
                           ),
-                        ),
+                          if (_isVideo) ...[
+                            const SizedBox(width: 28),
+                            _CallControl(
+                              icon: _cameraEnabled ? Icons.videocam_rounded : Icons.videocam_off_rounded,
+                              label: _cameraEnabled ? 'Camera off' : 'Camera on',
+                              onTap: _toggleCamera,
+                            ),
+                          ],
+                          const SizedBox(width: 28),
+                          _CallControl(
+                            icon: Icons.call_end_rounded,
+                            label: 'End call',
+                            color: NightLinkDesign.error,
+                            onTap: _leave,
+                          ),
+                        ]),
                       ),
-                    ],
-                  ),
+                    ),
+                  ]),
       ),
     );
   }
@@ -893,17 +1007,18 @@ class _CallControl extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: color.withOpacity(.18),
-            child: IconButton(
-              onPressed: onTap,
-              icon: Icon(icon, color: color),
-              iconSize: 25,
+          Material(
+            color: color == NightLinkDesign.error ? color : color.withOpacity(.16),
+            borderRadius: BorderRadius.circular(20),
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(20),
+              child: SizedBox(width: 58, height: 58,
+                child: Icon(icon, color: color == NightLinkDesign.error ? Colors.white : color, size: 25)),
             ),
           ),
-          const SizedBox(height: 6),
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          const SizedBox(height: 8),
+          Text(label, style: const TextStyle(color: NightLinkDesign.textMuted, fontSize: 11, fontWeight: FontWeight.w600)),
         ],
       );
 }

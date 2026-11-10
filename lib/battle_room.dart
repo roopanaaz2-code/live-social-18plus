@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'nightlink_design.dart';
+
 const _gold = Color(0xFFFFC857);
 const _blue = Color(0xFF2589FF);
 const _dark = Color(0xFF090D18);
@@ -466,21 +468,28 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
       },
       onDoubleTap: () => _doubleTapLike(userId),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         child: Stack(
           fit: StackFit.expand,
           children: [
             Container(
-              color: const Color(0xFF17233A),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(colors: [Color(0xFF1A2B45), Color(0xFF101725)],
+                    begin: Alignment.topLeft, end: Alignment.bottomRight),
+              ),
               child: videoTrack == null
                   ? Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.person, color: _blue, size: 48),
+                        NightLinkDesign.avatar(
+                          name: (player['display_name'] ?? 'Host').toString(),
+                          radius: 31,
+                          accent: NightLinkDesign.blue,
+                        ),
                         const SizedBox(height: 6),
                         Text((player['display_name'] ?? 'Host').toString(),
-                          style: const TextStyle(color: Colors.white70)),
-                        const Text('Connecting camera…', style: TextStyle(color: Colors.white38, fontSize: 10)),
+                          style: const TextStyle(color: NightLinkDesign.text, fontWeight: FontWeight.w600)),
+                        const Text('Connecting camera…', style: TextStyle(color: NightLinkDesign.textMuted, fontSize: 10)),
                       ],
                     )
                   : VideoTrackRenderer(videoTrack),
@@ -490,8 +499,8 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(.65),
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.black.withOpacity(.72),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(
                   children: [
@@ -501,7 +510,7 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     )),
                     const SizedBox(width: 6),
-                    const Icon(Icons.favorite, color: Colors.pinkAccent, size: 13),
+                    const Icon(Icons.favorite_rounded, color: Colors.pinkAccent, size: 13),
                     Text('${_hostLikeCount(userId)}', style: const TextStyle(color: Colors.pinkAccent, fontWeight: FontWeight.bold)),
                     const SizedBox(width: 8),
                     Text('$score pts', style: const TextStyle(color: _gold, fontWeight: FontWeight.bold)),
@@ -510,7 +519,15 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
               ),
             ),
             if (_selectedRecipientId == userId)
-              const Positioned(top: 8, right: 8, child: Icon(Icons.card_giftcard, color: _gold)),
+              Positioned(
+                top: 9, right: 9,
+                child: Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(color: NightLinkDesign.gold.withOpacity(.2),
+                      borderRadius: BorderRadius.circular(12)),
+                  child: const Icon(Icons.card_giftcard_rounded, color: NightLinkDesign.gold, size: 17),
+                ),
+              ),
           ],
         ),
       ),
@@ -602,20 +619,29 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
     return WillPopScope(
       onWillPop: () async { await _leave(); return false; },
       child: Scaffold(
-        backgroundColor: _dark,
+        backgroundColor: NightLinkDesign.background,
         appBar: AppBar(
-          backgroundColor: _dark,
+          backgroundColor: NightLinkDesign.background,
           title: Row(children: [
-            const Icon(Icons.circle, color: Colors.redAccent, size: 10),
+            const Icon(Icons.circle, color: NightLinkDesign.error, size: 9),
             const SizedBox(width: 7),
             Text(_winner == null ? 'LIVE PK BATTLE' : 'BATTLE RESULT',
-              style: const TextStyle(color: _gold, fontWeight: FontWeight.bold)),
+              style: const TextStyle(color: NightLinkDesign.text, fontWeight: FontWeight.w800)),
           ]),
           actions: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-              child: Text(_winner == null ? _timerText() : 'ENDED',
-                style: const TextStyle(color: _gold, fontWeight: FontWeight.bold, fontSize: 16)),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: (_winner == null ? NightLinkDesign.error : NightLinkDesign.textMuted).withOpacity(.13),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: (_winner == null ? NightLinkDesign.error : NightLinkDesign.textMuted).withOpacity(.24)),
+                ),
+                child: Text(_winner == null ? _timerText() : 'ENDED',
+                  style: TextStyle(color: _winner == null ? NightLinkDesign.error : NightLinkDesign.textMuted,
+                      fontWeight: FontWeight.w800, fontSize: 14)),
+              ),
             ),
           ],
         ),
@@ -624,7 +650,9 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
-              color: const Color(0xFF173A2B),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(colors: [Color(0xFF173A2B), Color(0xFF12251F)]),
+              ),
               child: Text(
                 _winner!['winner_team_no'] == null
                     ? 'DRAW • SCORES TIED'
@@ -634,23 +662,40 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
               ),
             ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-            child: Row(children: [
-              for (final team in _teamNumbers)
-                Expanded(child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF17233A),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _blue.withOpacity(.35)),
-                  ),
-                  child: Column(children: [
-                    Text('TEAM $team', style: const TextStyle(color: _blue, fontSize: 11)),
-                    Text('${_teamScore(team)}', style: const TextStyle(color: _gold, fontSize: 22, fontWeight: FontWeight.bold)),
-                  ]),
-                )),
-            ]),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 7),
+            child: LayoutBuilder(builder: (context, constraints) {
+              final cardWidth = (constraints.maxWidth - 8) / 2;
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final team in _teamNumbers)
+                    SizedBox(
+                      width: cardWidth,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFF1A2B45), Color(0xFF111827)]),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: NightLinkDesign.blue.withOpacity(.28)),
+                        ),
+                        child: Row(children: [
+                          Container(width: 32, height: 32, alignment: Alignment.center,
+                            decoration: BoxDecoration(color: NightLinkDesign.blue.withOpacity(.16),
+                                borderRadius: BorderRadius.circular(11)),
+                            child: Text('$team', style: const TextStyle(color: NightLinkDesign.blue, fontWeight: FontWeight.w800)),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text('TEAM $team', style: const TextStyle(color: NightLinkDesign.textMuted, fontSize: 10, letterSpacing: .8)),
+                            Text('${_teamScore(team)}', style: const TextStyle(color: NightLinkDesign.gold, fontSize: 21, fontWeight: FontWeight.w800)),
+                          ])),
+                        ]),
+                      ),
+                    ),
+                ],
+              );
+            }),
           ),
           Expanded(
             flex: 5,
@@ -664,7 +709,7 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
                         crossAxisCount: _players.length <= 2 ? 2 : 2,
                         crossAxisSpacing: 8,
                         mainAxisSpacing: 8,
-                        childAspectRatio: _players.length <= 2 ? .72 : .85,
+                        childAspectRatio: _players.length <= 2 ? .78 : .88,
                       ),
                       itemBuilder: (_, index) => _playerTile(_players[index]),
                     ),
@@ -675,9 +720,9 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFF34284B),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _gold.withOpacity(.5)),
+                gradient: const LinearGradient(colors: [Color(0xFF34284B), Color(0xFF241F39)]),
+                borderRadius: BorderRadius.circular(17),
+                border: Border.all(color: NightLinkDesign.gold.withOpacity(.42)),
               ),
               child: Row(children: [
                 Text((_giftBanner!['gift_emoji'] ?? '🎁').toString(), style: const TextStyle(fontSize: 26)),
@@ -686,28 +731,39 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
                   '${_giftBanner!['sender_name'] ?? 'Member'} sent ${_giftBanner!['gift_name'] ?? 'a gift'} to ${_giftBanner!['recipient_name'] ?? 'Host'}',
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 )),
-                Text('+ ${_giftBanner!['score_added'] ?? 0}', style: const TextStyle(color: _gold)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                  decoration: BoxDecoration(color: NightLinkDesign.gold.withOpacity(.15),
+                      borderRadius: BorderRadius.circular(12)),
+                  child: Text('+ ${_giftBanner!['score_added'] ?? 0}',
+                      style: const TextStyle(color: NightLinkDesign.gold, fontWeight: FontWeight.w800)),
+                ),
               ]),
             ),
           SizedBox(
-            height: 130,
+            height: 132,
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               children: _comments.map((comment) => Padding(
-                padding: const EdgeInsets.only(bottom: 5),
+                padding: const EdgeInsets.only(bottom: 7),
                 child: RichText(text: TextSpan(children: [
                   TextSpan(text: '${comment['display_name']}: ',
-                    style: const TextStyle(color: _gold, fontWeight: FontWeight.bold)),
+                    style: const TextStyle(color: NightLinkDesign.gold, fontWeight: FontWeight.w700)),
                   TextSpan(text: comment['content'].toString(),
-                    style: const TextStyle(color: Colors.white)),
+                    style: const TextStyle(color: NightLinkDesign.text, height: 1.3)),
                 ])),
               )).toList(),
             ),
           ),
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
-              child: Row(children: [
+            child: Container(
+              decoration: BoxDecoration(
+                color: NightLinkDesign.backgroundRaised,
+                border: Border(top: BorderSide(color: Colors.white.withOpacity(.07))),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                child: Row(children: [
                 Expanded(child: TextField(
                   controller: _commentController,
                   maxLength: 300,
@@ -715,7 +771,7 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
                     counterText: '',
                     hintText: 'Write a battle comment…',
                     filled: true,
-                    fillColor: const Color(0xFF151E31),
+                    fillColor: NightLinkDesign.surface,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: BorderSide.none),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
                   ),
@@ -723,28 +779,32 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
                 )),
                 IconButton(
                   onPressed: _sendingComment ? null : _sendComment,
-                  icon: const Icon(Icons.send, color: _blue),
+                  icon: const Icon(Icons.send_rounded, color: NightLinkDesign.blue),
                 ),
                 IconButton(
                   onPressed: _showGiftPicker,
-                  icon: const Icon(Icons.card_giftcard, color: _gold),
+                  icon: const Icon(Icons.card_giftcard_rounded, color: NightLinkDesign.gold),
                   tooltip: 'Send a gift',
                 ),
                 if (_isPlayer) ...[
                   IconButton(
                     onPressed: _toggleMic,
-                    icon: Icon(_micEnabled ? Icons.mic : Icons.mic_off, color: _blue),
+                    tooltip: _micEnabled ? 'Mute microphone' : 'Turn on microphone',
+                    icon: Icon(_micEnabled ? Icons.mic_rounded : Icons.mic_off_rounded, color: NightLinkDesign.blue),
                   ),
                   IconButton(
                     onPressed: _toggleCamera,
-                    icon: Icon(_cameraEnabled ? Icons.videocam : Icons.videocam_off, color: _blue),
+                    tooltip: _cameraEnabled ? 'Turn camera off' : 'Turn camera on',
+                    icon: Icon(_cameraEnabled ? Icons.videocam_rounded : Icons.videocam_off_rounded, color: NightLinkDesign.blue),
                   ),
                 ],
                 IconButton(
                   onPressed: _leave,
-                  icon: const Icon(Icons.call_end, color: Colors.redAccent),
+                  tooltip: 'Leave battle',
+                  icon: const Icon(Icons.call_end_rounded, color: NightLinkDesign.error),
                 ),
-              ]),
+                ]),
+              ),
             ),
           ),
         ]),
