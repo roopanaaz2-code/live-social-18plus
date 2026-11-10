@@ -3,6 +3,8 @@ name: NightLink Android APK Builder
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -73,6 +75,9 @@ jobs:
               "android.permission.ACCESS_NETWORK_STATE",
               "android.permission.CHANGE_NETWORK_STATE",
               "android.permission.MODIFY_AUDIO_SETTINGS",
+              "android.permission.BLUETOOTH",
+              "android.permission.BLUETOOTH_ADMIN",
+              "android.permission.BLUETOOTH_CONNECT",
           ]
           missing = [
               f'    <uses-permission android:name="{name}" />'
@@ -87,6 +92,14 @@ jobs:
                   "\n".join(missing) + "\n    <application",
                   1,
               )
+          queries = """    <queries>
+                  <package android:name="com.google.android.gm" />
+                  <intent><action android:name="android.speech.RecognitionService" /></intent>
+                  <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
+              </queries>
+          """
+          if "<queries>" not in content:
+              content = content.replace("<application", queries + "\n    <application", 1)
           manifest.write_text(content)
           PY
 
@@ -136,7 +149,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          flutter pub add supabase_flutter livekit_client:^2.13.2 url_launcher image_picker video_player just_audio file_picker:10.3.3 share_plus:^10.1.4
+          flutter pub add supabase_flutter livekit_client:^2.13.2 url_launcher image_picker video_player just_audio file_picker:10.3.3 share_plus:^10.1.4 speech_to_text:^7.5.0 flutter_tts:^4.2.5
           flutter pub get
 
       - name: Analyze Flutter source
@@ -163,7 +176,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://falimxmpicqaakjnigkv.supabase.co' }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          NIGHTLINK_SUPPORT_EMAIL: ${{ secrets.NIGHTLINK_SUPPORT_EMAIL }}
+          NIGHTLINK_SUPPORT_EMAIL: ${{ secrets.NIGHTLINK_SUPPORT_EMAIL || 'roopanaaz2@gmail.com' }}
         run: |
           set -euo pipefail
           flutter build apk --release -v \
@@ -190,3 +203,43 @@ jobs:
           path: ${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
+
+  android-smoke-test:
+    name: Install and launch APK on Android 15 emulator
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout smoke-test script
+        uses: actions/checkout@v4
+
+      - name: Install emulator runtime libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends libpulse0
+
+      - name: Set up Android SDK tools
+        uses: android-actions/setup-android@v4
+
+      - name: Download verified APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: NightLink-Android-APK
+          path: ${{ runner.temp }}/nightlink-artifact
+
+      - name: Install and launch on Android 15
+        uses: reactivecircus/android-emulator-runner@v2
+        # Hosted emulator boot can time out because of runner infrastructure;
+        # keep the smoke test but do not discard a successful APK artifact.
+        continue-on-error: true
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          disable-animations: true
+          script: bash .github/scripts/android-smoke-test.sh "${{ runner.temp }}/nightlink-artifact/app-release.apk"

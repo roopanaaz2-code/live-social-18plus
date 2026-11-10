@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -122,6 +124,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
   RealtimeChannel? _channel;
   bool _loading = true;
   bool _sending = false;
+  bool _loadingMessages = false;
+  Timer? _refreshTimer;
   String? _error;
   String get _myId => _db.auth.currentUser!.id;
 
@@ -136,9 +140,16 @@ class _ConversationScreenState extends State<ConversationScreen> {
         table: 'messages',
         callback: (_) => _loadMessages(),
       ).subscribe();
+    // Realtime is primary; low-frequency refresh recovers if Android suspends
+    // the WebSocket while the app is backgrounded or the network changes.
+    _refreshTimer = Timer.periodic(const Duration(seconds: 7), (_) {
+      if (mounted && !_loadingMessages) _loadMessages();
+    });
   }
 
   Future<void> _loadMessages() async {
+    if (_loadingMessages) return;
+    _loadingMessages = true;
     try {
       final filter = 'and(sender_id.eq.' + _myId + ',receiver_id.eq.' + widget.otherUserId +
         '),and(sender_id.eq.' + widget.otherUserId + ',receiver_id.eq.' + _myId + ')';
@@ -149,14 +160,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
       setState(() {
         _messages = List<Map<String, dynamic>>.from(rows);
         _loading = false;
+        _loadingMessages = false;
         _error = null;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scroll.hasClients) _scroll.jumpTo(_scroll.position.maxScrollExtent);
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
-      setState(() { _loading = false; _error = 'Messages could not be loaded. Check your connection.'; });
+      setState(() {
+        _loading = false;
+        _loadingMessages = false;
+        _error = 'Messages could not be loaded: $error';
+      });
     }
   }
 
@@ -172,10 +188,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
       });
       _input.clear();
       await _loadMessages();
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Message was not sent. Please try again.')),
+          SnackBar(content: Text('Message was not sent: $error')),
         );
       }
     } finally {
@@ -187,6 +203,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   void dispose() {
     _input.dispose();
     _scroll.dispose();
+    _refreshTimer?.cancel();
     if (_channel != null) _db.removeChannel(_channel!);
     super.dispose();
   }

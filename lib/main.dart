@@ -12,6 +12,7 @@ import 'chat.dart';
 import 'live_call.dart';
 import 'wallet.dart';
 import 'feed.dart';
+import 'ai_assistant.dart';
 
 const supabaseUrl = String.fromEnvironment(
   'SUPABASE_URL',
@@ -24,10 +25,7 @@ const supabaseKey = String.fromEnvironment(
 const gold = Color(0xFFFFC857);
 const blue = Color(0xFF2589FF);
 const dark = Color(0xFF090D18);
-const supportEmail = String.fromEnvironment(
-  'NIGHTLINK_SUPPORT_EMAIL',
-  defaultValue: 'roopanaaz2@gmail.com',
-);
+const supportEmail = 'roopanaaz2@gmail.com';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -479,12 +477,32 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       return;
     }
-    final uri = Uri(
+    // Prefer the Gmail app when installed, then fall back to the Android
+    // default mail handler so Contact Us still works without Gmail.
+    final gmailUri = Uri(
+      scheme: 'googlegmail',
+      host: 'co',
+      queryParameters: {
+        'to': supportEmail,
+        'subject': 'NightLink Support',
+      },
+    );
+    final mailtoUri = Uri(
       scheme: 'mailto',
-      path: supportEmail.trim(),
+      path: supportEmail,
       queryParameters: {'subject': 'NightLink Support'},
     );
-    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    var opened = false;
+    try {
+      if (await canLaunchUrl(gmailUri)) {
+        opened = await launchUrl(gmailUri, mode: LaunchMode.externalApplication);
+      }
+      if (!opened) {
+        opened = await launchUrl(mailtoUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (error) {
+      debugPrint('NightLink Contact Us launch failed: $error');
+    }
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No email app is available on this device.')),
@@ -537,6 +555,14 @@ class _HomeScreenState extends State<HomeScreen> {
             subtitle: 'Watch, upload and share short videos',
             color: gold,
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NightLinkFeedScreen())),
+          ),
+          const SizedBox(height: 12),
+          _HomeActionCard(
+            icon: Icons.auto_awesome,
+            title: 'NIGHTLINK AI',
+            subtitle: 'Ask questions, get smart help and talk by microphone',
+            color: blue,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NightLinkAiScreen())),
           ),
           const SizedBox(height: 12),
           _HomeActionCard(

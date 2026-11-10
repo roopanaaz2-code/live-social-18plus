@@ -27,12 +27,12 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const publishableKeysRaw = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS");
     const legacyAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    let publishableKey = legacyAnonKey;
+    let publishableKey = Deno.env.get("SUPABASE_PUBLISHABLE_KEY")?.trim() || legacyAnonKey;
 
     if (publishableKeysRaw) {
       try {
         const keys = JSON.parse(publishableKeysRaw);
-        publishableKey = keys.default ?? legacyAnonKey;
+        publishableKey = keys.default ?? legacyAnonKey ?? publishableKey;
       } catch {
         console.error("SUPABASE_PUBLISHABLE_KEYS is not valid JSON");
       }
