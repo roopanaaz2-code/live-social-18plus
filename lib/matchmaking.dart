@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'battle_room.dart';
+import 'nightlink_design.dart';
 
 const _gold = Color(0xFFFFC857);
 const _blue = Color(0xFF2589FF);
@@ -257,23 +258,33 @@ class _MatchLobbyState extends State<MatchLobby> {
   Widget build(BuildContext context) {
     final match = _activeMatch;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('MATCHMAKING'),
-        backgroundColor: _dark,
-      ),
+      appBar: AppBar(title: const Text('Battle lobby'), backgroundColor: NightLinkDesign.background),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 30),
         children: [
-          const Text(
-            'Choose your format',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          NightLinkPanel(
+            accent: NightLinkDesign.gold,
+            gradient: true,
+            padding: const EdgeInsets.all(21),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(
+                  width: 42, height: 42,
+                  decoration: BoxDecoration(color: NightLinkDesign.gold.withOpacity(.14),
+                      borderRadius: BorderRadius.circular(14)),
+                  child: const Icon(Icons.sports_mma_rounded, color: NightLinkDesign.gold),
+                ),
+                const SizedBox(width: 12),
+                NightLinkDesign.eyebrow('NightLink arena', color: NightLinkDesign.gold),
+              ]),
+              const SizedBox(height: 15),
+              const Text('Choose your battle', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 7),
+              const Text('Pick a format and enter the live queue. We’ll bring the players together when the lobby is ready.',
+                  style: TextStyle(color: NightLinkDesign.textMuted, height: 1.45)),
+            ]),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Join a live queue and we will create a match when enough players are ready.',
-            style: TextStyle(color: Colors.white60, height: 1.4),
-          ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
           if (_error != null) _Notice(text: _error!, error: true),
           if (_queueResult != null && _searchingFor != null)
             _QueueCard(
@@ -291,20 +302,45 @@ class _MatchLobbyState extends State<MatchLobby> {
               onEnter: () => _enterBattle(match.id),
             ),
           if (_liveBattles.isNotEmpty) ...[
-            const Padding(
-              padding: EdgeInsets.only(top: 14, bottom: 8),
-              child: Text('LIVE BATTLES • WATCH NOW', style: TextStyle(color: _gold, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+            Padding(
+              padding: const EdgeInsets.only(top: 18, bottom: 9),
+              child: Row(children: [
+                const Icon(Icons.wifi_tethering_rounded, size: 17, color: NightLinkDesign.error),
+                const SizedBox(width: 8),
+                NightLinkDesign.eyebrow('Live now', color: NightLinkDesign.gold),
+                const Spacer(),
+                Text('${_liveBattles.length} battles', style: const TextStyle(color: NightLinkDesign.textMuted, fontSize: 12)),
+              ]),
             ),
             for (final battle in _liveBattles)
               if (battle['match_id']?.toString() != match?.id)
-                Card(
-                  color: const Color(0xFF17233A),
-                  child: ListTile(
-                    leading: const Icon(Icons.live_tv, color: Colors.redAccent),
-                    title: Text('${battle['mode'] ?? 'PK'} LIVE', style: const TextStyle(color: _gold, fontWeight: FontWeight.bold)),
-                    subtitle: Text('${(battle['players'] as List? ?? []).length} players • viewers can comment and send gifts', style: const TextStyle(color: Colors.white60)),
-                    trailing: const Text('WATCH', style: TextStyle(color: _blue, fontWeight: FontWeight.bold)),
-                    onTap: () => _enterBattle(battle['match_id'].toString()),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 9),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(NightLinkDesign.radius),
+                      onTap: () => _enterBattle(battle['match_id'].toString()),
+                      child: NightLinkPanel(
+                        accent: NightLinkDesign.error,
+                        padding: const EdgeInsets.all(15),
+                        child: Row(children: [
+                          Container(width: 44, height: 44,
+                            decoration: BoxDecoration(color: NightLinkDesign.error.withOpacity(.12),
+                                borderRadius: BorderRadius.circular(14)),
+                            child: const Icon(Icons.live_tv_rounded, color: NightLinkDesign.error)),
+                          const SizedBox(width: 12),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text('${battle['mode'] ?? 'PK'} battle', style: const TextStyle(fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 4),
+                            Text('${(battle['players'] as List? ?? []).length} players • watch, comment and send gifts',
+                                style: const TextStyle(color: NightLinkDesign.textMuted, fontSize: 11)),
+                          ])),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.arrow_forward_rounded, color: NightLinkDesign.gold),
+                        ]),
+                      ),
+                    ),
                   ),
                 ),
           ],
@@ -334,21 +370,39 @@ class _FormatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final icon = format.capacity == 2
+        ? Icons.person_rounded
+        : format.code == '2v2' ? Icons.groups_rounded : Icons.grid_view_rounded;
     return Card(
-      color: const Color(0xFF11182B),
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: _blue.withOpacity(.18),
-          child: Text('${format.capacity}', style: const TextStyle(color: _blue)),
-        ),
-        title: Text(format.label, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(format.description, style: const TextStyle(color: Colors.white60)),
-        trailing: ElevatedButton(
-          onPressed: disabled ? null : onTap,
-          child: const Text('PLAY'),
-        ),
+      margin: const EdgeInsets.only(bottom: 11),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(children: [
+          Container(
+            width: 52, height: 52,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [Color(0xFF203A59), Color(0xFF17233A)],
+                  begin: Alignment.topLeft, end: Alignment.bottomRight),
+              borderRadius: BorderRadius.circular(17),
+              border: Border.all(color: NightLinkDesign.blue.withOpacity(.24)),
+            ),
+            child: Icon(icon, color: NightLinkDesign.blue, size: 25),
+          ),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(format.label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+            const SizedBox(height: 4),
+            Text(format.description, style: const TextStyle(color: NightLinkDesign.textMuted, fontSize: 12)),
+            const SizedBox(height: 7),
+            Text('${format.capacity} players', style: const TextStyle(color: NightLinkDesign.blue, fontSize: 11, fontWeight: FontWeight.w700)),
+          ])),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: disabled ? null : onTap,
+            style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12)),
+            child: const Text('JOIN'),
+          ),
+        ]),
       ),
     );
   }
@@ -364,20 +418,29 @@ class _QueueCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: const Color(0xFF162442),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
+    return NightLinkPanel(
+      accent: NightLinkDesign.gold,
+      gradient: true,
+      padding: const EdgeInsets.all(18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Searching ${format.label}', style: const TextStyle(color: _gold, fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text('${result.playerCount}/${result.capacity} players found', style: const TextStyle(color: Colors.white70)),
-          const SizedBox(height: 12),
-          LinearProgressIndicator(value: result.playerCount / result.capacity, color: _gold),
-          const SizedBox(height: 12),
-          OutlinedButton(onPressed: busy ? null : onCancel, child: const Text('CANCEL QUEUE')),
+          Row(children: [
+            const SizedBox(width: 42, height: 42,
+              child: CircularProgressIndicator(color: NightLinkDesign.gold, strokeWidth: 3)),
+            const SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Finding ${format.label}', style: const TextStyle(color: NightLinkDesign.gold, fontSize: 18, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              Text('${result.playerCount}/${result.capacity} players found', style: const TextStyle(color: NightLinkDesign.textMuted)),
+            ])),
+          ]),
+          const SizedBox(height: 17),
+          ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(
+            value: result.capacity == 0 ? 0.0 : (result.playerCount / result.capacity).clamp(0.0, 1.0).toDouble(),
+            color: NightLinkDesign.gold, backgroundColor: Colors.white10, minHeight: 7,
+          )),
+          const SizedBox(height: 14),
+          SizedBox(width: double.infinity, child: OutlinedButton(onPressed: busy ? null : onCancel, child: const Text('Cancel search'))),
         ]),
-      ),
     );
   }
 }
@@ -394,24 +457,36 @@ class _MatchCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final live = match.status == 'live';
-    return Card(
-      color: live ? const Color(0xFF173A2B) : const Color(0xFF2D2330),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
+    return NightLinkPanel(
+      accent: live ? NightLinkDesign.success : NightLinkDesign.gold,
+      gradient: true,
+      padding: const EdgeInsets.all(18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(live ? 'MATCH LIVE' : 'MATCH FOUND', style: const TextStyle(color: _gold, fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text('${match.mode}  •  ${match.playerCount}/${match.maxPlayers} players', style: const TextStyle(color: Colors.white70)),
+          Row(children: [
+            Icon(live ? Icons.wifi_tethering_rounded : Icons.check_circle_outline_rounded,
+                color: live ? NightLinkDesign.success : NightLinkDesign.gold, size: 21),
+            const SizedBox(width: 8),
+            Text(live ? 'MATCH LIVE' : 'MATCH FOUND',
+                style: TextStyle(color: live ? NightLinkDesign.success : NightLinkDesign.gold,
+                    fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: .9)),
+          ]),
+          const SizedBox(height: 9),
+          Text(match.mode, style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 5),
+          Text('${match.playerCount}/${match.maxPlayers} players in lobby', style: const TextStyle(color: NightLinkDesign.textMuted)),
           const SizedBox(height: 14),
-          if (!live) ElevatedButton(onPressed: busy ? null : onReady, child: const Text('I AM READY')),
+          if (!live) SizedBox(width: double.infinity, child: ElevatedButton.icon(
+            onPressed: busy ? null : onReady,
+            icon: const Icon(Icons.done_rounded),
+            label: const Text('I’m ready'),
+          )),
           if (live) SizedBox(width: double.infinity, child: ElevatedButton.icon(
             onPressed: busy ? null : onEnter,
             icon: const Icon(Icons.videocam),
-            label: const Text('ENTER LIVE VIDEO BATTLE'),
+            label: const Text('Enter live battle'),
           )),
-          TextButton(onPressed: busy ? null : onLeave, child: const Text('LEAVE MATCH')),
+          Center(child: TextButton(onPressed: busy ? null : onLeave, child: const Text('Leave match'))),
         ]),
-      ),
     );
   }
 }

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-const _gold = Color(0xFFFFC857);
-const _blue = Color(0xFF2589FF);
-const _dark = Color(0xFF090D18);
+import 'nightlink_design.dart';
 
 class ConnectionsScreen extends StatefulWidget {
   const ConnectionsScreen({super.key});
@@ -176,120 +174,215 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
     super.dispose();
   }
 
-  Widget _section(String title, List<Widget> children) => Card(
-    color: const Color(0xFF11182B),
-    margin: const EdgeInsets.only(bottom: 14),
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: const TextStyle(color: _gold, fontWeight: FontWeight.bold, letterSpacing: 1)),
-        const SizedBox(height: 12),
-        ...children,
+  Widget _section(String title, String description, List<Widget> children, {Color accent = NightLinkDesign.gold}) =>
+      NightLinkPanel(
+        accent: accent,
+        padding: const EdgeInsets.all(18),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                NightLinkDesign.eyebrow(title, color: accent),
+                const SizedBox(height: 5),
+                Text(description, style: const TextStyle(color: NightLinkDesign.textMuted, fontSize: 12, height: 1.4)),
+              ],
+            )),
+          ]),
+          const SizedBox(height: 16),
+          ...children,
+        ]),
+      );
+
+  Widget _personRow({
+    required Map<String, dynamic> person,
+    required Widget trailing,
+    Color accent = NightLinkDesign.blue,
+    String? fallbackName,
+  }) {
+    final name = (person['display_name'] ?? fallbackName ?? 'Member').toString();
+    final username = (person['username'] ?? 'unknown').toString();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(children: [
+        NightLinkDesign.avatar(
+          name: name,
+          imageUrl: person['avatar_url']?.toString(),
+          radius: 23,
+          accent: accent,
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+            const SizedBox(height: 3),
+            Text('@$username', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: NightLinkDesign.textMuted, fontSize: 12)),
+          ],
+        )),
+        const SizedBox(width: 6),
+        trailing,
       ]),
-    ),
-  );
+    );
+  }
+
+  Widget _emptyMessage(IconData icon, String text) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(children: [
+          Icon(icon, color: NightLinkDesign.textMuted, size: 19),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: const TextStyle(color: NightLinkDesign.textMuted, fontSize: 13, height: 1.4))),
+        ]),
+      );
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: _dark,
     appBar: AppBar(
-      backgroundColor: _dark,
-      title: const Text('CONNECTIONS', style: TextStyle(color: _gold, fontWeight: FontWeight.bold)),
-      actions: [IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh, color: _blue))],
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          NightLinkDesign.eyebrow('Your circle'),
+          const SizedBox(height: 2),
+          const Text('Connections'),
+        ],
+      ),
+      actions: [IconButton(
+        tooltip: 'Refresh connections',
+        onPressed: _loading ? null : _load,
+        icon: const Icon(Icons.refresh_rounded),
+      )],
     ),
     body: _loading
-      ? const Center(child: CircularProgressIndicator(color: _gold))
+      ? const Center(child: CircularProgressIndicator())
       : _error != null
-        ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text(_error!, textAlign: TextAlign.center),
-            ElevatedButton(onPressed: _load, child: const Text('RETRY')),
-          ]))
+        ? Center(child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: NightLinkPanel(
+              accent: NightLinkDesign.error,
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.cloud_off_rounded, color: NightLinkDesign.error, size: 34),
+                const SizedBox(height: 12),
+                Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: NightLinkDesign.textMuted, height: 1.45)),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(onPressed: _load, icon: const Icon(Icons.refresh_rounded), label: const Text('Try again')),
+              ]),
+            ),
+          ))
         : RefreshIndicator(
-            color: _gold,
+            color: NightLinkDesign.gold,
             onRefresh: _load,
             child: ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
               children: [
-                _section('YOUR PUBLIC PROFILE', [
+                _section('Your public profile', 'Make it easy for people to recognize and find you.', [
+                  Row(children: [
+                    NightLinkDesign.avatar(name: _displayName.text.isEmpty ? 'You' : _displayName.text, radius: 27, accent: NightLinkDesign.gold),
+                    const SizedBox(width: 12),
+                    const Expanded(child: Text('Your profile is visible to other members.', style: TextStyle(color: NightLinkDesign.textMuted, fontSize: 13, height: 1.4))),
+                  ]),
+                  const SizedBox(height: 15),
                   TextField(
                     controller: _username,
-                    decoration: const InputDecoration(labelText: 'Username', prefixText: '@'),
+                    decoration: const InputDecoration(labelText: 'Username', prefixText: '@', prefixIcon: Icon(Icons.alternate_email_rounded)),
                     textCapitalization: TextCapitalization.none,
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: _displayName,
                     maxLength: 40,
-                    decoration: const InputDecoration(labelText: 'Display name'),
+                    decoration: const InputDecoration(labelText: 'Display name', prefixIcon: Icon(Icons.badge_outlined)),
                   ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: ElevatedButton(
+                  const SizedBox(height: 2),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
                       onPressed: _busy ? null : _saveProfile,
-                      style: ElevatedButton.styleFrom(backgroundColor: _gold, foregroundColor: _dark),
-                      child: const Text('SAVE PROFILE'),
+                      icon: _busy ? const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.check_rounded),
+                      label: const Text('Save profile'),
                     ),
                   ),
-                  const Text('Other members can find you by username. Your email address is not shown on your public profile.',
-                    style: TextStyle(color: Colors.white54, fontSize: 12)),
-                ]),
-                _section('FIND MEMBERS', [
-                  Row(children: [
+                  const SizedBox(height: 8),
+                  const Text('Your email address is never shown on your public profile.', style: TextStyle(color: NightLinkDesign.textMuted, fontSize: 12, height: 1.4)),
+                ], accent: NightLinkDesign.gold),
+                const SizedBox(height: 14),
+                _section('Find members', 'Search by exact username to send a connection request.', [
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Expanded(child: TextField(
                       controller: _search,
                       textCapitalization: TextCapitalization.none,
-                      decoration: const InputDecoration(hintText: 'Search exact username', prefixText: '@'),
+                      decoration: const InputDecoration(hintText: 'Search username', prefixText: '@', prefixIcon: Icon(Icons.search_rounded)),
                       onSubmitted: (_) => _searchPeople(),
                     )),
-                    const SizedBox(width: 8),
-                    IconButton.filled(
-                      onPressed: _busy ? null : _searchPeople,
-                      style: IconButton.styleFrom(backgroundColor: _blue),
-                      icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.search),
+                    const SizedBox(width: 9),
+                    SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: IconButton.filled(
+                        tooltip: 'Search members',
+                        onPressed: _busy ? null : _searchPeople,
+                        style: IconButton.styleFrom(backgroundColor: NightLinkDesign.blue, foregroundColor: NightLinkDesign.text),
+                        icon: _busy ? const SizedBox(width: 19, height: 19, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.search_rounded),
+                      ),
                     ),
                   ]),
-                  for (final person in _results) ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const CircleAvatar(child: Icon(Icons.person)),
-                    title: Text((person['display_name'] ?? 'Member').toString()),
-                    subtitle: Text('@${person['username'] ?? ''}', style: const TextStyle(color: Colors.white54)),
-                    trailing: IconButton(
-                      tooltip: 'Send connection request',
-                      onPressed: _busy ? null : () => _sendRequest(person['username'].toString()),
-                      icon: const Icon(Icons.person_add_alt_1, color: _gold),
-                    ),
-                  ),
-                ]),
-                _section('INCOMING REQUESTS (${_requests.length})', [
+                  if (_results.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    for (final person in _results)
+                      _personRow(
+                        person: person,
+                        accent: NightLinkDesign.blue,
+                        trailing: IconButton.filledTonal(
+                          tooltip: 'Send connection request',
+                          onPressed: _busy ? null : () => _sendRequest(person['username'].toString()),
+                          style: IconButton.styleFrom(foregroundColor: NightLinkDesign.gold, backgroundColor: NightLinkDesign.gold.withOpacity(.12)),
+                          icon: const Icon(Icons.person_add_alt_1_rounded),
+                        ),
+                      ),
+                  ],
+                ], accent: NightLinkDesign.blue),
+                const SizedBox(height: 14),
+                _section('Incoming requests', 'People who would like to connect with you.', [
                   if (_requests.isEmpty)
-                    const Text('No pending requests.', style: TextStyle(color: Colors.white54))
-                  else
-                    for (final request in _requests)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const CircleAvatar(child: Icon(Icons.person_add)),
-                        title: Text((request['profile']['display_name'] ?? 'Member').toString()),
-                        subtitle: Text('@${request['profile']['username'] ?? 'unknown'}'),
-                        trailing: Wrap(spacing: 2, children: [
-                          IconButton(onPressed: () => _respond(request['id'].toString(), true), icon: const Icon(Icons.check_circle, color: Colors.greenAccent)),
-                          IconButton(onPressed: () => _respond(request['id'].toString(), false), icon: const Icon(Icons.cancel, color: Colors.redAccent)),
-                        ]),
-                      ),
-                ]),
-                _section('YOUR CONNECTIONS (${_friends.length})', [
+                    _emptyMessage(Icons.mark_email_read_outlined, 'No pending requests right now.'),
+                  for (final request in _requests)
+                    _personRow(
+                      person: Map<String, dynamic>.from(request['profile'] as Map),
+                      fallbackName: 'Member',
+                      accent: NightLinkDesign.gold,
+                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                        IconButton.filledTonal(
+                          tooltip: 'Accept request',
+                          onPressed: () => _respond(request['id'].toString(), true),
+                          style: IconButton.styleFrom(foregroundColor: NightLinkDesign.success, backgroundColor: NightLinkDesign.success.withOpacity(.12)),
+                          icon: const Icon(Icons.check_rounded),
+                        ),
+                        const SizedBox(width: 4),
+                        IconButton.filledTonal(
+                          tooltip: 'Decline request',
+                          onPressed: () => _respond(request['id'].toString(), false),
+                          style: IconButton.styleFrom(foregroundColor: NightLinkDesign.error, backgroundColor: NightLinkDesign.error.withOpacity(.12)),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ]),
+                    ),
+                ], accent: NightLinkDesign.gold),
+                const SizedBox(height: 14),
+                _section('Your connections', 'Your accepted connections are ready to chat.', [
                   if (_friends.isEmpty)
-                    const Text('No connections yet. Search a username and send a request.',
-                      style: TextStyle(color: Colors.white54))
-                  else
-                    for (final friend in _friends)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const CircleAvatar(child: Icon(Icons.person, color: _blue)),
-                        title: Text((friend['display_name'] ?? 'Member').toString()),
-                        subtitle: Text('@${friend['username'] ?? ''}'),
-                        trailing: const Icon(Icons.verified_user, color: _gold),
+                    _emptyMessage(Icons.people_outline_rounded, 'No connections yet. Search for a username above to get started.'),
+                  for (final friend in _friends)
+                    _personRow(
+                      person: friend,
+                      accent: NightLinkDesign.blue,
+                      trailing: Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(color: NightLinkDesign.success.withOpacity(.1), shape: BoxShape.circle),
+                        child: const Icon(Icons.verified_rounded, color: NightLinkDesign.success, size: 20),
                       ),
-                ]),
+                    ),
+                ], accent: NightLinkDesign.blue),
               ],
             ),
           ),

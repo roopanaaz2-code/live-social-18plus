@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-const _gold = Color(0xFFFFC857);
-const _blue = Color(0xFF2589FF);
-const _dark = Color(0xFF090D18);
+import 'nightlink_design.dart';
 
 class VipScreen extends StatefulWidget {
   const VipScreen({super.key});
@@ -32,60 +30,117 @@ class _VipScreenState extends State<VipScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: _dark,
-    appBar: AppBar(
-      backgroundColor: _dark,
-      title: const Text('NIGHTLINK VIP', style: TextStyle(color: _gold, fontWeight: FontWeight.bold)),
-    ),
-    body: _active == null
-      ? const Center(child: CircularProgressIndicator(color: _gold))
-      : ListView(
-          padding: const EdgeInsets.all(22),
-          children: [
-            const Icon(Icons.workspace_premium, color: _gold, size: 76),
-            const SizedBox(height: 14),
-            const Text('VIP MEMBERSHIP', textAlign: TextAlign.center,
-              style: TextStyle(color: _gold, fontSize: 25, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            Text(
-              _active! ? 'VIP access is active on this account.' : 'Discover the NightLink VIP benefits.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white70),
-            ),
-            if (_error != null) Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.orangeAccent)),
-            ),
-            const SizedBox(height: 22),
-            const Card(
-              color: Color(0xFF11182B),
-              child: ListTile(
-                leading: Icon(Icons.check_circle, color: _blue),
-                title: Text('Ad-free access', style: TextStyle(color: _gold, fontWeight: FontWeight.bold)),
-                subtitle: Text('VIP accounts do not receive NightLink banner ads.',
-                  style: TextStyle(color: Colors.white60)),
-              ),
-            ),
-            const SizedBox(height: 18),
-            if (_active!)
-              const Card(
-                color: Color(0xFF17233D),
-                child: Padding(
-                  padding: EdgeInsets.all(18),
-                  child: Text('DEVELOPER VIP: lifetime access is enabled for the NightLink developer account. All gifts are free on this account.',
-                    textAlign: TextAlign.center, style: TextStyle(color: _gold, fontWeight: FontWeight.bold)),
-                ),
-              )
-            else
-              const Card(
-                color: Color(0xFF17233D),
-                child: Padding(
-                  padding: EdgeInsets.all(18),
-                  child: Text('VIP checkout is not enabled yet. No payment will be taken until a real payment provider and verified purchase flow are configured.',
-                    textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, height: 1.5)),
-                ),
-              ),
-          ],
+        backgroundColor: NightLinkDesign.background,
+        appBar: AppBar(
+          backgroundColor: NightLinkDesign.background,
+          title: const Text('NightLink VIP'),
         ),
-  );
+        body: _active == null
+            ? const Center(child: CircularProgressIndicator(color: NightLinkDesign.gold))
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
+                children: [
+                  NightLinkPanel(
+                    accent: NightLinkDesign.gold,
+                    gradient: true,
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 22),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 66,
+                          height: 66,
+                          decoration: BoxDecoration(
+                            color: NightLinkDesign.gold.withOpacity(.12),
+                            borderRadius: BorderRadius.circular(22),
+                          ),
+                          child: const Icon(Icons.workspace_premium_rounded, color: NightLinkDesign.gold, size: 36),
+                        ),
+                        const SizedBox(height: 17),
+                        NightLinkDesign.eyebrow('NightLink membership', color: NightLinkDesign.gold),
+                        const SizedBox(height: 7),
+                        Text(
+                          _active! ? 'VIP access is active' : 'NightLink VIP',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: NightLinkDesign.text, fontSize: 25, fontWeight: FontWeight.w800, letterSpacing: -.4),
+                        ),
+                        const SizedBox(height: 9),
+                        Text(
+                          _active!
+                              ? 'VIP access is active on this account.'
+                              : 'Explore the benefit currently associated with VIP access.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: NightLinkDesign.textMuted, fontSize: 14, height: 1.45),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 14),
+                    NightLinkPanel(
+                      accent: NightLinkDesign.gold,
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline_rounded, color: NightLinkDesign.gold, size: 19),
+                          const SizedBox(width: 10),
+                          Expanded(child: Text(_error!, style: const TextStyle(color: NightLinkDesign.textMuted, fontSize: 13))),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 23),
+                  NightLinkDesign.eyebrow('Membership benefit', color: NightLinkDesign.blue),
+                  const SizedBox(height: 12),
+                  NightLinkPanel(
+                    accent: NightLinkDesign.blue,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(color: NightLinkDesign.blue.withOpacity(.13), borderRadius: BorderRadius.circular(14)),
+                          child: const Icon(Icons.notifications_off_outlined, color: NightLinkDesign.blue),
+                        ),
+                        const SizedBox(width: 13),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Ad-free access', style: TextStyle(color: NightLinkDesign.text, fontWeight: FontWeight.w700, fontSize: 15)),
+                              SizedBox(height: 5),
+                              Text('VIP accounts do not receive NightLink banner ads.', style: TextStyle(color: NightLinkDesign.textMuted, fontSize: 13, height: 1.4)),
+                            ],
+                          ),
+                        ),
+                        if (_active!) const Icon(Icons.check_circle_rounded, color: NightLinkDesign.success, size: 20),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  NightLinkPanel(
+                    accent: _active! ? NightLinkDesign.gold : NightLinkDesign.blue,
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          _active! ? Icons.verified_outlined : Icons.lock_outline_rounded,
+                          color: _active! ? NightLinkDesign.gold : NightLinkDesign.blue,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _active!
+                                ? 'Your account currently has VIP access. This screen reflects account status; it does not manage or renew a subscription.'
+                                : 'VIP checkout is not enabled yet. No payment will be taken until a real payment provider and verified purchase flow are configured.',
+                            style: const TextStyle(color: NightLinkDesign.textMuted, fontSize: 13, height: 1.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+      );
 }
