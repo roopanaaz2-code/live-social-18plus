@@ -71,16 +71,16 @@ jobs:
           admob_app_id = os.environ.get("ADMOB_ANDROID_APP_ID", "").strip() or "ca-app-pub-3940256099942544~3347511713"
           if admob_app_id:
               import re
-              if not re.fullmatch(r"ca-app-pub-\\d+~\\d+", admob_app_id):
+              if not re.fullmatch(r"ca-app-pub-\d+~\d+", admob_app_id):
                   raise SystemExit("ADMOB_ANDROID_APP_ID must be a valid Android AdMob App ID.")
               metadata = (
-                  '        <meta-data\\n'
-                  '            android:name="com.google.android.gms.ads.APPLICATION_ID"\\n'
-                  f'            android:value="{admob_app_id}"/>\\n'
+                  '        <meta-data\n'
+                  '            android:name="com.google.android.gms.ads.APPLICATION_ID"\n'
+                  f'            android:value="{admob_app_id}"/>\n'
               )
               if "com.google.android.gms.ads.APPLICATION_ID" in content:
                   content = re.sub(
-                      r'<meta-data[^>]*android:name="com\\.google\\.android\\.gms\\.ads\\.APPLICATION_ID"[^>]*/>',
+                      r'<meta-data[^>]*android:name="com\.google\.android\.gms\.ads\.APPLICATION_ID"[^>]*/>',
                       metadata.strip(),
                       content,
                       count=1,
