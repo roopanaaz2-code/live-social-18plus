@@ -249,7 +249,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       NightLinkDesign.eyebrow('ACCOUNT PRIVACY'),
                       const SizedBox(height: 8),
                       const Text(
-                        'Your profile photo and display name can be visible to other NightLink members. Your email address remains private.',
+                        'Your profile photo and display name are visible to other NightLink members. Profile photos use public image links, so anyone with the link may be able to view the image. Your email address remains private.',
                         style: TextStyle(color: NightLinkDesign.textMuted, height: 1.5),
                       ),
                     ]),
