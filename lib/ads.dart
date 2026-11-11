@@ -92,7 +92,7 @@ class _NightLinkBannerAdState extends State<NightLinkBannerAd> {
     if (widget.hide || !nightLinkAdsReady || _banner != null) return;
     final ad = BannerAd(
       adUnitId: _bannerAdUnitId,
-      request: const AdRequest(),
+      request: AdRequest(),
       size: AdSize.banner,
       listener: BannerAdListener(
         onAdLoaded: (ad) {
