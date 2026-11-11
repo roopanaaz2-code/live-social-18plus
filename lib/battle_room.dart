@@ -576,6 +576,15 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
     return 0;
   }
 
+  int get _maxTeamScore {
+    var highest = 1;
+    for (final row in _scores) {
+      final score = (row['score'] as num?)?.toInt() ?? 0;
+      if (score > highest) highest = score;
+    }
+    return highest;
+  }
+
   String _timerText() {
     final minutes = _remaining.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = _remaining.inSeconds.remainder(60).toString().padLeft(2, '0');
@@ -740,6 +749,26 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
                                   ),
                                 ],
                               ],
+                            ),
+                            const SizedBox(height: 5),
+                            TweenAnimationBuilder<double>(
+                              tween: Tween<double>(
+                                begin: 0,
+                                end: (_teamScore(team) / _maxTeamScore).clamp(0.0, 1.0).toDouble(),
+                              ),
+                              duration: const Duration(milliseconds: 650),
+                              curve: Curves.easeOutCubic,
+                              builder: (_, value, __) => ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: LinearProgressIndicator(
+                                  value: value,
+                                  minHeight: 5,
+                                  backgroundColor: Colors.white.withOpacity(.10),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    team == 1 ? NightLinkDesign.blue : Colors.pinkAccent,
+                                  ),
+                                ),
+                              ),
                             ),
                           ])),
                         ]),
