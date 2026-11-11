@@ -255,7 +255,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ]),
                   ),
                   const SizedBox(height: 12),
-                  const NightLinkPrivacyOptionsButton(),
+                  if (nightLinkAdsReady) const NightLinkPrivacyOptionsButton(),
                 ],
               ),
             ),
