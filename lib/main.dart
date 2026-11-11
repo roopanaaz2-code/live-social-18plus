@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'ads.dart';
+import 'profile.dart';
 import 'connections.dart';
 import 'vip.dart';
 import 'matchmaking.dart';
@@ -707,7 +708,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_selectedTab == 1) return const MatchLobby();
     if (_selectedTab == 2) return const NightLinkFeedScreen();
     if (_selectedTab == 3) return const ChatScreen();
-    return const ConnectionsScreen();
+    return const ProfileScreen();
   }
 
   @override
