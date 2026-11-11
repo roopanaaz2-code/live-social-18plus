@@ -25,10 +25,12 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
   RealtimeChannel? _channel;
   Timer? _clock;
   Timer? _giftBannerTimer;
+  Timer? _scoreDeltaTimer;
   DateTime? _endsAt;
   Duration _remaining = const Duration(minutes: 4);
   List<Map<String, dynamic>> _players = [];
   List<Map<String, dynamic>> _scores = [];
+  final Map<int, int> _scoreDeltas = {};
   List<Map<String, dynamic>> _profileLikes = [];
   List<Map<String, dynamic>> _gifts = [];
   List<Map<String, dynamic>> _comments = [];
@@ -218,8 +220,31 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
 
   Future<void> _refreshData() async {
     try {
+      final previousScores = <int, int>{
+        for (final row in _scores)
+          (row['team_no'] as num?)?.toInt() ?? 1:
+              (row['score'] as num?)?.toInt() ?? 0,
+      };
       await _loadData();
-      if (mounted) setState(() {});
+      final deltas = <int, int>{};
+      for (final row in _scores) {
+        final team = (row['team_no'] as num?)?.toInt() ?? 1;
+        final next = (row['score'] as num?)?.toInt() ?? 0;
+        final before = previousScores[team];
+        if (before != null && next != before) deltas[team] = next - before;
+      }
+      if (!mounted) return;
+      setState(() {
+        _scoreDeltas
+          ..clear()
+          ..addAll(deltas);
+      });
+      _scoreDeltaTimer?.cancel();
+      if (deltas.isNotEmpty) {
+        _scoreDeltaTimer = Timer(const Duration(milliseconds: 2200), () {
+          if (mounted) setState(_scoreDeltas.clear);
+        });
+      }
     } catch (_) {}
   }
 
@@ -483,6 +508,7 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
                       children: [
                         NightLinkDesign.avatar(
                           name: (player['display_name'] ?? 'Host').toString(),
+                          imageUrl: player['avatar_url']?.toString(),
                           radius: 31,
                           accent: NightLinkDesign.blue,
                         ),
@@ -550,6 +576,15 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
     return 0;
   }
 
+  int get _maxTeamScore {
+    var highest = 1;
+    for (final row in _scores) {
+      final score = (row['score'] as num?)?.toInt() ?? 0;
+      if (score > highest) highest = score;
+    }
+    return highest;
+  }
+
   String _timerText() {
     final minutes = _remaining.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = _remaining.inSeconds.remainder(60).toString().padLeft(2, '0');
@@ -577,6 +612,7 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
   void dispose() {
     _clock?.cancel();
     _giftBannerTimer?.cancel();
+    _scoreDeltaTimer?.cancel();
     _commentController.dispose();
     if (_channel != null) _db.removeChannel(_channel!);
     final room = _room;
@@ -688,7 +724,52 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
                           const SizedBox(width: 10),
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Text('TEAM $team', style: const TextStyle(color: NightLinkDesign.textMuted, fontSize: 10, letterSpacing: .8)),
-                            Text('${_teamScore(team)}', style: const TextStyle(color: NightLinkDesign.gold, fontSize: 21, fontWeight: FontWeight.w800)),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 450),
+                                  transitionBuilder: (child, animation) =>
+                                      ScaleTransition(scale: animation, child: child),
+                                  child: Text(
+                                    '${_teamScore(team)}',
+                                    key: ValueKey<int>(_teamScore(team)),
+                                    style: const TextStyle(color: NightLinkDesign.gold, fontSize: 21, fontWeight: FontWeight.w800),
+                                  ),
+                                ),
+                                if (_scoreDeltas[team] != null) ...[
+                                  const SizedBox(width: 7),
+                                  Text(
+                                    '${_scoreDeltas[team]! > 0 ? '+' : ''}${_scoreDeltas[team]}',
+                                    style: TextStyle(
+                                      color: _scoreDeltas[team]! > 0 ? Colors.greenAccent : Colors.redAccent,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 5),
+                            TweenAnimationBuilder<double>(
+                              tween: Tween<double>(
+                                begin: 0,
+                                end: (_teamScore(team) / _maxTeamScore).clamp(0.0, 1.0).toDouble(),
+                              ),
+                              duration: const Duration(milliseconds: 650),
+                              curve: Curves.easeOutCubic,
+                              builder: (_, value, __) => ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: LinearProgressIndicator(
+                                  value: value,
+                                  minHeight: 5,
+                                  backgroundColor: Colors.white.withOpacity(.10),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    team == 1 ? NightLinkDesign.blue : Colors.pinkAccent,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ])),
                         ]),
                       ),
@@ -716,29 +797,47 @@ class _BattleRoomScreenState extends State<BattleRoomScreen> {
             ),
           ),
           if (_giftBanner != null)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFF34284B), Color(0xFF241F39)]),
-                borderRadius: BorderRadius.circular(17),
-                border: Border.all(color: NightLinkDesign.gold.withOpacity(.42)),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 420),
+              switchInCurve: Curves.easeOutBack,
+              switchOutCurve: Curves.easeIn,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(scale: animation, child: child),
               ),
-              child: Row(children: [
-                Text((_giftBanner!['gift_emoji'] ?? '🎁').toString(), style: const TextStyle(fontSize: 26)),
-                const SizedBox(width: 8),
-                Expanded(child: Text(
-                  '${_giftBanner!['sender_name'] ?? 'Member'} sent ${_giftBanner!['gift_name'] ?? 'a gift'} to ${_giftBanner!['recipient_name'] ?? 'Host'}',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                )),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-                  decoration: BoxDecoration(color: NightLinkDesign.gold.withOpacity(.15),
-                      borderRadius: BorderRadius.circular(12)),
-                  child: Text('+ ${_giftBanner!['score_added'] ?? 0}',
-                      style: const TextStyle(color: NightLinkDesign.gold, fontWeight: FontWeight.w800)),
+              child: Container(
+                key: ValueKey<String>((_giftBanner!['id'] ?? DateTime.now().microsecondsSinceEpoch).toString()),
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF34284B), Color(0xFF241F39)]),
+                  borderRadius: BorderRadius.circular(17),
+                  border: Border.all(color: NightLinkDesign.gold.withOpacity(.55)),
+                  boxShadow: [BoxShadow(color: NightLinkDesign.gold.withOpacity(.16), blurRadius: 18, spreadRadius: 1)],
                 ),
-              ]),
+                child: Row(children: [
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: .35, end: 1),
+                    duration: const Duration(milliseconds: 650),
+                    curve: Curves.elasticOut,
+                    builder: (_, scale, child) => Transform.scale(scale: scale, child: child),
+                    child: Text((_giftBanner!['gift_emoji'] ?? '🎁').toString(),
+                      style: const TextStyle(fontSize: 38)),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(
+                    '${_giftBanner!['sender_name'] ?? 'Member'} sent ${_giftBanner!['gift_name'] ?? 'a gift'} to ${_giftBanner!['recipient_name'] ?? 'Host'}',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  )),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                    decoration: BoxDecoration(color: NightLinkDesign.gold.withOpacity(.15),
+                        borderRadius: BorderRadius.circular(12)),
+                    child: Text('+ ${_giftBanner!['score_added'] ?? 0}',
+                        style: const TextStyle(color: NightLinkDesign.gold, fontWeight: FontWeight.w800)),
+                  ),
+                ]),
+              ),
             ),
           SizedBox(
             height: 132,
