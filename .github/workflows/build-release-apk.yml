@@ -68,7 +68,7 @@ jobs:
 
           manifest = Path(sys.argv[1])
           content = manifest.read_text()
-          admob_app_id = os.environ.get("ADMOB_ANDROID_APP_ID", "").strip()
+          admob_app_id = os.environ.get("ADMOB_ANDROID_APP_ID", "").strip() or "ca-app-pub-3940256099942544~3347511713"
           if admob_app_id:
               import re
               if not re.fullmatch(r"ca-app-pub-\\d+~\\d+", admob_app_id):
