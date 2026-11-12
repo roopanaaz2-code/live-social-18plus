@@ -48,16 +48,20 @@ adb shell pm path "$PACKAGE_NAME" | grep -q '^package:'
 echo "Clearing old logs and launching NightLink..."
 adb logcat -c
 adb shell am force-stop "$PACKAGE_NAME"
-adb shell monkey -p "$PACKAGE_NAME" 1
-
+LAUNCH_OUTPUT="$(adb shell am start -W -n "$PACKAGE_NAME/.MainActivity" 2>&1 | tr -d '\r')"
+printf '%s\n' "$LAUNCH_OUTPUT"
+if ! grep -Fq 'Status: ok' <<< "$LAUNCH_OUTPUT"; then
+  echo "::error::Android did not report a successful NightLink activity launch."
+  false
+fi
 echo "Waiting for NightLink process to start..."
 APP_PID=""
-for attempt in $(seq 1 30); do
+for attempt in $(seq 1 90); do
   APP_PID="$(adb shell pidof "$PACKAGE_NAME" 2>/dev/null | tr -d '\r' || true)"
   if [ -n "$APP_PID" ]; then
     break
   fi
-  sleep 2
+  sleep 1
 done
 if [ -z "$APP_PID" ]; then
   echo "::error::NightLink did not create an application process after launch."

@@ -179,6 +179,20 @@ jobs:
           flutter pub add supabase_flutter livekit_client:^2.13.2 url_launcher image_picker video_player just_audio file_picker:10.3.3 share_plus:^10.1.4 speech_to_text:^7.5.0 flutter_tts:^4.2.5 google_mobile_ads
           flutter pub get
 
+      - name: Verify WorkManager release runtime version
+        working-directory: ${{ runner.temp }}/nightlink/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :app:dependencyInsight \
+            --dependency androidx.work:work-runtime \
+            --configuration releaseRuntimeClasspath | tee "$RUNNER_TEMP/nightlink-workmanager-dependency.txt"
+          grep -Eq 'androidx\.work:work-runtime:2\.11\.2([^0-9]|$)' \
+            "$RUNNER_TEMP/nightlink-workmanager-dependency.txt" || {
+              echo "Release runtime did not resolve AndroidX WorkManager 2.11.2." >&2
+              exit 1
+            }
+
       - name: Analyze Flutter source
         working-directory: ${{ runner.temp }}/nightlink
         shell: bash
@@ -266,9 +280,9 @@ jobs:
         # remains diagnosable without losing the downloadable build artifact.
         with:
           api-level: 35
-          target: google_apis
+          target: default
           arch: x86_64
-          profile: pixel_6
+          profile: pixel_2
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           script: bash .github/scripts/android-smoke-test.sh "${{ runner.temp }}/nightlink-artifact/app-release.apk"
