@@ -16,7 +16,6 @@ import 'wallet.dart';
 
 const _gold = NightLinkDesign.gold;
 const _blue = NightLinkDesign.blue;
-const _dark = NightLinkDesign.background;
 
 class NightLinkFeedScreen extends StatefulWidget {
   const NightLinkFeedScreen({super.key});
@@ -33,6 +32,7 @@ class _NightLinkFeedScreenState extends State<NightLinkFeedScreen> {
   bool _loading = true;
   bool _uploading = false;
   String? _error;
+  int _activePage = 0;
 
   String get _myId => _db.auth.currentUser!.id;
 
@@ -91,6 +91,7 @@ class _NightLinkFeedScreenState extends State<NightLinkFeedScreen> {
       setState(() {
         _posts = enriched;
         _musicTracks = tracks;
+        _activePage = _posts.isEmpty ? 0 : _activePage.clamp(0, _posts.length - 1).toInt();
         _loading = false;
       });
     } catch (error) {
@@ -424,86 +425,77 @@ class _NightLinkFeedScreenState extends State<NightLinkFeedScreen> {
     );
   }
 
+  Widget _feedTopOverlay() => Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 10, 8),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text('NIGHTLINK', style: TextStyle(
+                    color: _gold,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.5,
+                  )),
+                ),
+                _FeedOverlayButton(
+                  icon: Icons.add_a_photo_outlined,
+                  label: _uploading ? 'UPLOADING' : 'POST',
+                  onPressed: _uploading ? null : _createPost,
+                ),
+                const SizedBox(width: 5),
+                _FeedOverlayButton(
+                  icon: Icons.hub_outlined,
+                  label: 'CONNECT',
+                  onPressed: _openConnections,
+                ),
+                const SizedBox(width: 5),
+                _FeedOverlayButton(
+                  icon: Icons.logout_rounded,
+                  label: 'SIGN OUT',
+                  onPressed: () async => _db.auth.signOut(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: NightLinkDesign.background,
-        appBar: AppBar(
-          backgroundColor: NightLinkDesign.background,
-          titleSpacing: 20,
-          title: Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: _gold.withOpacity(.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _gold.withOpacity(.25)),
-                ),
-                child: const Icon(Icons.nightlife, color: _gold, size: 19),
-              ),
-              const SizedBox(width: 10),
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('NIGHTLINK', style: TextStyle(
-                    color: _gold, fontWeight: FontWeight.w800, letterSpacing: 1.6, fontSize: 15,
-                  )),
-                  Text('VIDEO FEED', style: TextStyle(
-                    color: NightLinkDesign.textMuted, fontSize: 9, letterSpacing: 1.5,
-                    fontWeight: FontWeight.w700,
-                  )),
-                ],
-              ),
-            ],
-          ),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 2),
-              child: TextButton.icon(
-                onPressed: _openConnections,
-                icon: const Icon(Icons.hub_outlined, size: 19),
-                label: const Text('CONNECT'),
-                style: TextButton.styleFrom(
-                  foregroundColor: _blue,
-                  textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: .7),
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                ),
-              ),
-            ),
-            IconButton(
-              onPressed: () async => _db.auth.signOut(),
-              icon: const Icon(Icons.logout_rounded, color: NightLinkDesign.textMuted, size: 20),
-              tooltip: 'Sign out',
-            ),
-          ],
-        ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _uploading ? null : _createPost,
-          backgroundColor: _gold,
-          foregroundColor: _dark,
-          elevation: 8,
-          icon: _uploading
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Icon(Icons.add_a_photo_outlined),
-          label: Text(_uploading ? 'UPLOADING…' : 'POST A VIDEO'),
-        ),
         body: _loading
-            ? const _FeedStatusPanel(
-                icon: Icons.bolt_rounded,
-                eyebrow: 'YOUR NIGHTLINK',
-                title: 'Finding your feed',
-                message: 'A moment while fresh videos load.',
-                loading: true,
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  const _FeedStatusPanel(
+                    icon: Icons.bolt_rounded,
+                    eyebrow: 'YOUR NIGHTLINK',
+                    title: 'Finding your feed',
+                    message: 'A moment while fresh videos load.',
+                    loading: true,
+                  ),
+                  _feedTopOverlay(),
+                ],
               )
             : _error != null
-                ? _FeedStatusPanel(
-                    icon: Icons.wifi_off_rounded,
-                    eyebrow: 'FEED UNAVAILABLE',
-                    title: 'Couldn’t load videos',
-                    message: _error!,
-                    onRetry: _loadFeed,
+                ? Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _FeedStatusPanel(
+                        icon: Icons.wifi_off_rounded,
+                        eyebrow: 'FEED UNAVAILABLE',
+                        title: 'Couldn’t load videos',
+                        message: _error!,
+                        onRetry: _loadFeed,
+                      ),
+                      _feedTopOverlay(),
+                    ],
                   )
                 : RefreshIndicator(
                     onRefresh: _loadFeed,
@@ -511,51 +503,84 @@ class _NightLinkFeedScreenState extends State<NightLinkFeedScreen> {
                     backgroundColor: NightLinkDesign.surfaceRaised,
                     child: LayoutBuilder(
                       builder: (context, constraints) {
-                        final pageHeight = constraints.maxHeight;
                         if (_posts.isEmpty) {
-                          return ListView(
-                            physics: const AlwaysScrollableScrollPhysics(),
+                          return Stack(
+                            fit: StackFit.expand,
                             children: [
-                              SizedBox(
-                                height: pageHeight,
-                                child: _EmptyFeedState(onCreate: _createPost),
+                              ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                children: [
+                                  SizedBox(
+                                    height: constraints.maxHeight,
+                                    child: _EmptyFeedState(onCreate: _createPost),
+                                  ),
+                                ],
                               ),
+                              _feedTopOverlay(),
                             ],
                           );
                         }
-                        return ListView.builder(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.fromLTRB(9, 4, 9, 12),
-                          itemCount: _posts.length,
-                          itemBuilder: (context, index) {
-                            final post = _posts[index];
-                            final videoUrl = _db.storage.from('nightlink-videos')
-                                .getPublicUrl(post['video_path'].toString());
-                            String? audioUrl;
-                            if (post['audio_path'] != null && post['audio_path'].toString().isNotEmpty) {
-                              final bucket = post['audio_source'] == 'app' ? 'nightlink-audio' : 'nightlink-audio';
-                              audioUrl = _db.storage.from(bucket).getPublicUrl(post['audio_path'].toString());
-                            }
-                            return SizedBox(
-                              height: pageHeight - 8,
-                              child: Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: _VideoPostCard(
+                        return Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            PageView.builder(
+                              itemCount: _posts.length,
+                              onPageChanged: (index) => setState(() => _activePage = index),
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              itemBuilder: (context, index) {
+                                final post = _posts[index];
+                                final videoUrl = _db.storage.from('nightlink-videos')
+                                    .getPublicUrl(post['video_path'].toString());
+                                String? audioUrl;
+                                if (post['audio_path'] != null && post['audio_path'].toString().isNotEmpty) {
+                                  audioUrl = _db.storage.from('nightlink-audio')
+                                      .getPublicUrl(post['audio_path'].toString());
+                                }
+                                return _VideoPostCard(
                                   key: ValueKey(post['id']),
                                   post: post,
                                   videoUrl: videoUrl,
                                   audioUrl: audioUrl,
+                                  isActive: index == _activePage,
                                   onLike: () => _like(post),
                                   onComment: () => _comments(post),
                                   onShare: () => _share(post),
-                                ),
-                              ),
-                            );
-                          },
+                                );
+                              },
+                            ),
+                            _feedTopOverlay(),
+                          ],
                         );
                       },
                     ),
                   ),
+      );
+}
+
+class _FeedOverlayButton extends StatelessWidget {
+  const _FeedOverlayButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) => TextButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 15),
+        label: Text(label),
+        style: TextButton.styleFrom(
+          foregroundColor: Colors.white,
+          backgroundColor: const Color(0x99090D18),
+          textStyle: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: .4),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+          minimumSize: const Size(0, 34),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
       );
 }
 
@@ -680,6 +705,7 @@ class _VideoPostCard extends StatefulWidget {
     required this.post,
     required this.videoUrl,
     required this.audioUrl,
+    required this.isActive,
     required this.onLike,
     required this.onComment,
     required this.onShare,
@@ -688,6 +714,7 @@ class _VideoPostCard extends StatefulWidget {
   final Map<String, dynamic> post;
   final String videoUrl;
   final String? audioUrl;
+  final bool isActive;
   final VoidCallback onLike;
   final VoidCallback onComment;
   final VoidCallback onShare;
@@ -702,6 +729,8 @@ class _VideoPostCardState extends State<_VideoPostCard> {
   bool _ready = false;
   bool _audioReady = false;
   bool _playing = false;
+  bool _disposed = false;
+  int _playbackRequest = 0;
 
   @override
   void initState() {
@@ -713,35 +742,101 @@ class _VideoPostCardState extends State<_VideoPostCard> {
   Future<void> _initialize() async {
     try {
       await _video.initialize();
+      if (_disposed) return;
       await _video.setLooping(true);
       if (widget.audioUrl != null) {
         await _video.setVolume(0);
+        if (_disposed) return;
         await _audio.setUrl(widget.audioUrl!);
+        if (_disposed) return;
         _audioReady = true;
       }
       if (mounted) setState(() => _ready = true);
+      if (widget.isActive) await _applyActiveState(true);
     } catch (_) {
       if (mounted) setState(() => _ready = false);
     }
   }
 
-  Future<void> _togglePlay() async {
-    if (!_ready) return;
-    if (_playing) {
-      await _video.pause();
-      if (_audioReady) await _audio.pause();
-    } else {
+  @override
+  void didUpdateWidget(covariant _VideoPostCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive != widget.isActive) {
+      _applyActiveState(widget.isActive);
+    }
+  }
+
+  Future<void> _applyActiveState(bool active) async {
+    final request = ++_playbackRequest;
+    if (!active || !_ready) {
+      try {
+        await _video.pause();
+        if (_audioReady) await _audio.pause();
+      } catch (_) {}
+      if (mounted && request == _playbackRequest) setState(() => _playing = false);
+      return;
+    }
+
+    try {
       await _video.play();
+      if (request != _playbackRequest || !widget.isActive || _disposed) {
+        await _video.pause();
+        if (_audioReady) await _audio.pause();
+        return;
+      }
       if (_audioReady) {
         await _audio.seek(Duration.zero);
+        if (request != _playbackRequest || !widget.isActive || _disposed) {
+          await _audio.pause();
+          await _video.pause();
+          return;
+        }
         await _audio.play();
       }
+      if (mounted && request == _playbackRequest && widget.isActive) {
+        setState(() => _playing = true);
+      }
+    } catch (_) {
+      if (mounted && request == _playbackRequest) setState(() => _playing = false);
     }
-    if (mounted) setState(() => _playing = !_playing);
+  }
+
+  Future<void> _togglePlay() async {
+    if (!_ready || !widget.isActive) return;
+    final request = ++_playbackRequest;
+    try {
+      if (_playing) {
+        await _video.pause();
+        if (_audioReady) await _audio.pause();
+      } else {
+        await _video.play();
+        if (request != _playbackRequest || !widget.isActive || _disposed) {
+          await _video.pause();
+          if (_audioReady) await _audio.pause();
+          return;
+        }
+        if (_audioReady) {
+          await _audio.seek(Duration.zero);
+          if (request != _playbackRequest || !widget.isActive || _disposed) {
+            await _audio.pause();
+            await _video.pause();
+            return;
+          }
+          await _audio.play();
+        }
+      }
+    } catch (_) {
+      return;
+    }
+    if (mounted && request == _playbackRequest && widget.isActive) {
+      setState(() => _playing = !_playing);
+    }
   }
 
   @override
   void dispose() {
+    _disposed = true;
+    _playbackRequest++;
     _video.dispose();
     _audio.dispose();
     super.dispose();
@@ -753,16 +848,8 @@ class _VideoPostCardState extends State<_VideoPostCard> {
     final caption = (widget.post['caption'] ?? '').toString().trim();
     final videoSize = _ready ? _video.value.size : Size.zero;
     final hasVideoFrame = _ready && videoSize.width > 0 && videoSize.height > 0;
-    return Container(
-      decoration: BoxDecoration(
-        color: NightLinkDesign.backgroundRaised,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: Colors.white.withOpacity(.08)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(.3), blurRadius: 20, offset: const Offset(0, 10)),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
+    return ColoredBox(
+      color: NightLinkDesign.backgroundRaised,
       child: Stack(
         fit: StackFit.expand,
         children: [

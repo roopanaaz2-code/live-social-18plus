@@ -705,7 +705,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _selectedContent(String name, bool hideAds) {
     if (_selectedTab == 0) return _homeContent(name, hideAds);
-    if (_selectedTab == 1) return const MatchLobby();
+    if (_selectedTab == 1) return const NightLinkAiScreen();
     if (_selectedTab == 2) return const NightLinkFeedScreen();
     if (_selectedTab == 3) return const ChatScreen();
     return const ProfileScreen();
@@ -749,9 +749,9 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Home',
           ),
           NavigationDestination(
-            icon: Icon(Icons.explore_outlined),
-            selectedIcon: Icon(Icons.explore),
-            label: 'Discover',
+            icon: Icon(Icons.auto_awesome_outlined),
+            selectedIcon: Icon(Icons.auto_awesome),
+            label: 'NightLink AI',
           ),
           NavigationDestination(
             icon: Icon(Icons.play_circle_outline),
