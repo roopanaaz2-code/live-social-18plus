@@ -137,6 +137,14 @@ jobs:
           }
           KOTLIN
 
+          # google_mobile_ads currently brings AndroidX WorkManager 2.7.0, whose
+          # reflective Room database initializer crashes in optimized release APKs.
+          cat >> "$BUILD_DIR/android/app/build.gradle.kts" <<'WORKMANAGER'
+          dependencies {
+              implementation("androidx.work:work-runtime:2.11.2")
+          }
+          WORKMANAGER
+
           # Recent AndroidX dependencies used by NightLink require compileSdk 36.
           python3 - "$BUILD_DIR/android/app/build.gradle.kts" <<'PY'
           import re
@@ -254,9 +262,8 @@ jobs:
 
       - name: Install and launch on Android 15
         uses: reactivecircus/android-emulator-runner@v2
-        # Hosted emulator boot can time out because of runner infrastructure;
-        # keep the smoke test but do not discard a successful APK artifact.
-        continue-on-error: true
+        # The build job uploads the APK before this test, so a launch failure
+        # remains diagnosable without losing the downloadable build artifact.
         with:
           api-level: 35
           target: google_apis
