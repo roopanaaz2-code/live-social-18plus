@@ -1,0 +1,267 @@
+name: NightLink Android APK Builder (Fresh Queue)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightlink-android-apk-fresh-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build NightLink release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9'
+          cache: true
+
+      # The Flutter action does not install Android SDK command-line tools or ADB.
+      # Install them explicitly before any emulator commands are used.
+      - name: Set up Android SDK tools
+        uses: android-actions/setup-android@v4
+
+      - name: Show toolchain versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter --version
+          java -version
+
+      - name: Generate Android host project
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_DIR="$RUNNER_TEMP/nightlink"
+          flutter create --project-name nightlink --org com.nightlink "$BUILD_DIR"
+          test -f "$BUILD_DIR/android/gradlew"
+          test -f "$BUILD_DIR/android/gradle/wrapper/gradle-wrapper.jar"
+          chmod +x "$BUILD_DIR/android/gradlew"
+          cp -R lib/. "$BUILD_DIR/lib/"
+          # flutter create generates a sample test that references MyApp; NightLink has its own app entry point.
+          rm -rf "$BUILD_DIR/test"
+
+          ADMOB_ANDROID_APP_ID="${{ secrets.ADMOB_ANDROID_APP_ID }}" python3 - "$BUILD_DIR/android/app/src/main/AndroidManifest.xml" <<'PY'
+          import os
+          import sys
+          from pathlib import Path
+
+          manifest = Path(sys.argv[1])
+          content = manifest.read_text()
+          admob_app_id = os.environ.get("ADMOB_ANDROID_APP_ID", "").strip() or "ca-app-pub-3940256099942544~3347511713"
+          if admob_app_id:
+              import re
+              if not re.fullmatch(r"ca-app-pub-\d+~\d+", admob_app_id):
+                  raise SystemExit("ADMOB_ANDROID_APP_ID must be a valid Android AdMob App ID.")
+              metadata = (
+                  '        <meta-data\n'
+                  '            android:name="com.google.android.gms.ads.APPLICATION_ID"\n'
+                  f'            android:value="{admob_app_id}"/>\n'
+              )
+              if "com.google.android.gms.ads.APPLICATION_ID" in content:
+                  content = re.sub(
+                      r'<meta-data[^>]*android:name="com\.google\.android\.gms\.ads\.APPLICATION_ID"[^>]*/>',
+                      metadata.strip(),
+                      content,
+                      count=1,
+                  )
+              else:
+                  content = content.replace("</application>", metadata + "    </application>", 1)
+          permissions = [
+              "android.permission.INTERNET",
+              "android.permission.CAMERA",
+              "android.permission.RECORD_AUDIO",
+              "android.permission.ACCESS_NETWORK_STATE",
+              "android.permission.CHANGE_NETWORK_STATE",
+              "android.permission.MODIFY_AUDIO_SETTINGS",
+              "android.permission.BLUETOOTH",
+              "android.permission.BLUETOOTH_ADMIN",
+              "android.permission.BLUETOOTH_CONNECT",
+          ]
+          missing = [
+              f'    <uses-permission android:name="{name}" />'
+              for name in permissions
+              if name not in content
+          ]
+          if missing:
+              if "<application" not in content:
+                  raise SystemExit("AndroidManifest.xml is missing its <application> element.")
+              content = content.replace(
+                  "<application",
+                  "\n".join(missing) + "\n    <application",
+                  1,
+              )
+          queries = """    <queries>
+                  <package android:name="com.google.android.gm" />
+                  <intent><action android:name="android.speech.RecognitionService" /></intent>
+                  <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
+              </queries>
+          """
+          if "<queries>" not in content:
+              content = content.replace("<application", queries + "\n    <application", 1)
+          manifest.write_text(content)
+          PY
+
+          echo "Generated Gradle wrapper:"
+          grep '^distributionUrl=' "$BUILD_DIR/android/gradle/wrapper/gradle-wrapper.properties"
+
+          # file_picker currently compiles Java for JVM 11 but defaults Kotlin to 1.8.
+          # Align only that plugin's Kotlin target; leave Android Java compile classpaths untouched.
+          cat >> "$BUILD_DIR/android/build.gradle.kts" <<'KOTLIN'
+          gradle.projectsEvaluated {
+              project(":file_picker").tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+                  compilerOptions {
+                      jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+                  }
+              }
+          }
+          KOTLIN
+
+          # Recent AndroidX dependencies used by NightLink require compileSdk 36.
+          python3 - "$BUILD_DIR/android/app/build.gradle.kts" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          gradle_file = Path(sys.argv[1])
+          content = gradle_file.read_text()
+          compile_pattern = re.compile(
+              r"(?m)^(\s*compileSdk\s*=\s*)(?:flutter\.compileSdkVersion|\d+)\s*$"
+          )
+          updated, compile_count = compile_pattern.subn(r"\g<1>36", content, count=1)
+          if compile_count != 1:
+              raise SystemExit("Could not safely locate the generated app compileSdk setting.")
+
+          min_pattern = re.compile(
+              r"(?m)^(\s*minSdk\s*=\s*)(?:flutter\.minSdkVersion|\d+)\s*$"
+          )
+          updated, min_count = min_pattern.subn(r"\g<1>24", updated, count=1)
+          if min_count != 1:
+              raise SystemExit("Could not safely locate the generated app minSdk setting.")
+
+          gradle_file.write_text(updated)
+          print("Android app compileSdk set to 36 and minSdk set to 24 (Android 7.0+ baseline).")
+          PY
+
+      - name: Resolve Flutter dependencies
+        working-directory: ${{ runner.temp }}/nightlink
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub add supabase_flutter livekit_client:^2.13.2 url_launcher image_picker video_player just_audio file_picker:10.3.3 share_plus:^10.1.4 speech_to_text:^7.5.0 flutter_tts:^4.2.5 google_mobile_ads
+          flutter pub get
+
+      - name: Analyze Flutter source
+        working-directory: ${{ runner.temp }}/nightlink
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings
+
+      - name: Check Supabase configuration
+        shell: bash
+        env:
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_PUBLISHABLE_KEY" || {
+            echo "SUPABASE_PUBLISHABLE_KEY secret is missing." >&2
+            exit 1
+          }
+
+      - name: Build release APK
+        working-directory: ${{ runner.temp }}/nightlink
+        shell: bash
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://falimxmpicqaakjnigkv.supabase.co' }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          NIGHTLINK_SUPPORT_EMAIL: ${{ secrets.NIGHTLINK_SUPPORT_EMAIL || 'roopanaaz2@gmail.com' }}
+          ADMOB_BANNER_AD_UNIT_ID: ${{ secrets.ADMOB_BANNER_AD_UNIT_ID }}
+        run: |
+          set -euo pipefail
+          flutter build apk --release -v \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY" \
+            --dart-define=NIGHTLINK_SUPPORT_EMAIL="$NIGHTLINK_SUPPORT_EMAIL" \
+            --dart-define=ADMOB_ANDROID_APP_ID="${{ secrets.ADMOB_ANDROID_APP_ID }}" \
+            --dart-define=ADMOB_BANNER_AD_UNIT_ID="$ADMOB_BANNER_AD_UNIT_ID"
+
+      # Keep the successfully built APK available even if the emulator infrastructure fails.
+      - name: Verify release APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk"
+          test -s "$APK" || {
+            echo "Release APK was not generated or is empty." >&2
+            exit 1
+          }
+          ls -lh "$APK"
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NightLink-Android-APK
+          path: ${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  android-smoke-test:
+    name: Install and launch APK on Android 15 emulator
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout smoke-test script
+        uses: actions/checkout@v4
+
+      - name: Install emulator runtime libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends libpulse0
+
+      - name: Set up Android SDK tools
+        uses: android-actions/setup-android@v4
+
+      - name: Download verified APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: NightLink-Android-APK
+          path: ${{ runner.temp }}/nightlink-artifact
+
+      - name: Install and launch on Android 15
+        uses: reactivecircus/android-emulator-runner@v2
+        # Hosted emulator boot can time out because of runner infrastructure;
+        # keep the smoke test but do not discard a successful APK artifact.
+        continue-on-error: true
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          disable-animations: true
+          script: bash .github/scripts/android-smoke-test.sh "${{ runner.temp }}/nightlink-artifact/app-release.apk"
