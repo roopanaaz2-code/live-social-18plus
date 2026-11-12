@@ -50,9 +50,12 @@ adb logcat -c
 adb shell am force-stop "$PACKAGE_NAME"
 LAUNCH_OUTPUT="$(adb shell am start -W -n "$PACKAGE_NAME/.MainActivity" 2>&1 | tr -d '\r')"
 printf '%s\n' "$LAUNCH_OUTPUT"
-if ! grep -Fq 'Status: ok' <<< "$LAUNCH_OUTPUT"; then
-  echo "::error::Android did not report a successful NightLink activity launch."
+if ! grep -Fq "Activity: $PACKAGE_NAME/.MainActivity" <<< "$LAUNCH_OUTPUT"; then
+  echo "::error::Android did not resolve NightLink's MainActivity launch."
   false
+fi
+if grep -Fq 'Status: timeout' <<< "$LAUNCH_OUTPUT"; then
+  echo "Android's launch wait timed out; verifying the reported activity and process directly."
 fi
 echo "Waiting for NightLink process to start..."
 APP_PID=""
