@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: nightlink-android-apk-fresh-${{ github.ref }}
@@ -248,21 +248,6 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      # Publish a durable APK download on every successful main-branch build.
-      # Pull-request builds never publish releases.
-      - name: Publish APK to GitHub Release
-        if: github.event_name != 'pull_request'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: nightlink-build-${{ github.run_number }}-${{ github.run_attempt }}
-          name: NightLink Android build ${{ github.run_number }} (attempt ${{ github.run_attempt }})
-          generate_release_notes: true
-          make_latest: true
-          files: ${{ runner.temp }}/nightlink/build/app/outputs/flutter-apk/app-release.apk
-          fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   android-smoke-test:
     name: Install and launch APK on Android 15 emulator
     needs: build
@@ -301,3 +286,29 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           script: bash .github/scripts/android-smoke-test.sh "${{ runner.temp }}/nightlink-artifact/app-release.apk"
+
+  publish-release:
+    name: Publish permanent APK release
+    needs: [build, android-smoke-test]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified APK
+        uses: actions/download-artifact@v4
+        with:
+          name: NightLink-Android-APK
+          path: ${{ runner.temp }}/nightlink-release
+
+      - name: Publish APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightlink-build-${{ github.run_number }}-${{ github.run_attempt }}
+          name: NightLink Android build ${{ github.run_number }} (attempt ${{ github.run_attempt }})
+          generate_release_notes: true
+          make_latest: true
+          files: ${{ runner.temp }}/nightlink-release/app-release.apk
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
