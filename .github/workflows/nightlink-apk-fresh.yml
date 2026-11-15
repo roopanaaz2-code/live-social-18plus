@@ -226,7 +226,8 @@ jobs:
             --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY" \
             --dart-define=NIGHTLINK_SUPPORT_EMAIL="$NIGHTLINK_SUPPORT_EMAIL" \
             --dart-define=ADMOB_ANDROID_APP_ID="${{ secrets.ADMOB_ANDROID_APP_ID }}" \
-            --dart-define=ADMOB_BANNER_AD_UNIT_ID="$ADMOB_BANNER_AD_UNIT_ID"
+            --dart-define=ADMOB_BANNER_AD_UNIT_ID="$ADMOB_BANNER_AD_UNIT_ID" \
+            --dart-define=ADMOB_USE_TEST_ADS=true
 
       # Keep the successfully built APK available even if the emulator infrastructure fails.
       - name: Verify release APK
