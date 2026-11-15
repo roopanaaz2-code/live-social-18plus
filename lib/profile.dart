@@ -255,7 +255,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ]),
                   ),
                   const SizedBox(height: 12),
-                  if (nightLinkAdsReady) const NightLinkPrivacyOptionsButton(),
+                  ValueListenableBuilder<bool>(
+                    valueListenable: nightLinkPrivacyOptionsRequired,
+                    builder: (context, required, child) =>
+                        required ? const NightLinkPrivacyOptionsButton() : const SizedBox.shrink(),
+                  ),
                 ],
               ),
             ),
